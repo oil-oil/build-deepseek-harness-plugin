@@ -1,0 +1,4 @@
+interface:
+  display_name: "构建 DeepSeek Harness 插件"
+  short_description: "按官方接口创建、迁移、调试并发布 Harness 插件"
+  default_prompt: "使用 $build-deepseek-harness-plugin 按目标 Harness commit 的公开扩展点创建或改造插件，并完成构建、安装与运行时验证。"
