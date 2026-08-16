@@ -37,6 +37,10 @@ example-plugin/
 
 `lib/` 是 TypeScript 包的发布产物。官方[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)的最小示例可以直接发布 `index.js`；Git 源码安装若还要构建，官方要求自包含 `prepare`。把 `lib/` 提交进仓库、让入口无需安装期构建，是本 Skill 验证过的项目约定，不是官方主路径。
 
+本地迭代的插件必须先有 git 基线提交。没有提交就改 6K 行包，误改无法回退。`lib/` 可提交可不提交，但源码、patch、测试和构建配置必须能回到一个已知状态。
+
+profile 用 `file:` / 硬链接装本地包时，不要用 `cp` 覆盖 `lib/` 里已存在的文件：`cp` 会先 unlink 再创建，profile 里那份就变成孤儿旧产物。应原地覆写（`writeFile` / `cat src > dest`）。tsdown 原地写 JS 通常仍保持硬链接；额外 `cp` 附属脚本最容易踩坑。改过构建复制策略后，检查 `~/.dsh/profiles/<name>/node_modules/<pkg>/lib/` 是否仍与源码 inode 相同。
+
 ## package.json
 
 下面是 Client-only 插件的最小结构。版本号必须按目标 Harness 实际版本调整。
@@ -312,7 +316,8 @@ CSS 规则：
 - 字号与行高成对设置；保留键盘焦点可见性和 reduced-motion 行为。
 - Feature CSS 不写 light/dark 分支，共享主题分支归 Theme 服务和主题包管理。
 - 不覆盖 `button`、`input`、`[role=tab]` 等全局选择器。
-- 若运行时添加独立 style tag，卸载插件时根据产品要求清理；纯静态组件样式可保留但必须无全局影响。
+- 运行时插入的 `<style data-plugin>` 必须可更新、可释放：已存在则改 `textContent`，不要再插一份旧样式压住新样式；`apply()` 的 disposer 删掉这些标签，并在重新挂载时按登记表写回。
+- 写到 `documentElement` 的自定义 CSS 变量（例如侧栏宽度）也必须在 disposer 里 `removeProperty`。
 
 ## 构建产物检查
 

@@ -97,7 +97,7 @@ Host 注册服务不等于 Client 自动获得 `ctx.remote.<namespace>`。开始
 
 独立仓库也可以手写 invocation descriptor（zod codec + `TypertRemoteService`），再导出 `./typert` 并在 Client 里 `ctx.remote.$mount(...)`。这是已验证的项目约定，不是官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 生成流水线的替代文档。Host 与 Client 必须同一套方法与 schema。改契约后要重建两端、**重启** `dsh` 进程，再硬刷新浏览器。官方 Gateway 只处理一元请求和一元结果，没有推送；磁盘或任务要近实时，就由 Host 失效缓存并增加 `revision`，Client 轮询廉价状态。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段，官方文档没有单独写这条。
 
-本地开发可以把 `lib/` hardlink 或 `file:` 链到 `$DSH_HOME/profiles/<name>/node_modules/<pkg>`，这样 `pnpm build` 会更新运行树。只改已有方法内部实现通常不必重启；改 schema / 方法名 / `dsh.client.inject` / patch 行必须重启。
+本地开发可以把 `lib/` hardlink 或 `file:` 链到 `$DSH_HOME/profiles/<name>/node_modules/<pkg>`，这样 `pnpm build` 会更新运行树。只改已有方法内部实现通常不必重启；改 schema / 方法名 / `dsh.client.inject` / patch 行必须重启。`file:` 依赖是打包硬链接：tsdown 原地写 JS 会一起更新，但 `cp` 附属脚本会 unlink 后新建，profile 里那份变成孤儿旧文件。附属脚本必须原地覆写。detached 预览服务、Ego 空间这类进程不能只记内存 Map；Harness 重启后 Map 丢了、进程还在，要有磁盘登记并在启动时按 pid/命令行回收。
 
 ## Settings 安全更新
 

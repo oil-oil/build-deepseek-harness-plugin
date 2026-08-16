@@ -78,6 +78,7 @@ Slot Catalog 公开的是挂载协议，不代表宿主内部 React 组件也可
 - 官方 [UI primitives](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/README.zh.md)：`MarkdownText` 只渲染绝对 HTTP(S) 图片；相对路径、本地绝对路径和 `file:` 只保留 alt。本地图要自己起静态服务再改写 URL。
 - 内置 `@` mention 芯片按默认短路径序列化。自定义 XML 会被官方芯片样式裁切。这是产品控件边界，不是 Catalog 字段。
 - 用 `padding-left` 等给对话让位时，浮层关闭必须清掉；残留占位是检查器常见回归。
+- 不要用 `querySelector` 绑宿主内部 DOM（例如 `[data-conversation-scroll]`）。这违背官方「不依赖 DOM 结构」的约定，Harness 改一次布局就会断。没有公开 inset API 时，把这类权宜之计收进一个可释放模块，卸载时清 padding 和自定义 CSS 变量；不要散落在多个组件里。
 
 ## 注册模式
 

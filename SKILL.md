@@ -73,7 +73,7 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 - **新增插件**：使用自己的 Cordis ID、服务名和 Settings namespace。
 - **替换官方插件**：先读取被替换插件的 patch、provider、Settings schema、Credentials 和能力契约；在 patch 中禁用原插件并插入自己的唯一 ID。保留必要的外部契约，但不要复用官方 Cordis ID。
 
-替换插件必须证明原能力没有倒退。例如底层模型已原生支持某项能力时直接透传，只对缺失能力做桥接。扩展官方 Settings schema 时保留全部官方字段，Client 只修改自己负责的字段路径。
+替换插件必须证明原能力没有倒退。例如底层模型已原生支持某项能力时直接透传，只对缺失能力做桥接。扩展官方 Settings schema 时保留全部官方字段，Client 只修改自己负责的字段路径。禁用官方插件、插入自己的 ID，写在**本插件**的 `cordis.patch.yml` 里，不要只写在某个 profile 的 patch 上；换一个只装这个包的 profile 也必须得到同一套替换语义。
 
 ## 标准流程
 
@@ -119,7 +119,7 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 
 面向模型的工具走官方[开发一个工具](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.zh.md)：`ctx.tools.register(defineTool({...}))`。`defineTool` 的 schema 会进入系统提示；Slot 是浏览器 UI 接线，[官方 Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)写明它不进入模型请求。工具给人的模型调用，Slot 给人点；两者共用同一个 Host 服务，不要长成两套模型。没进 system prompt、工具结果或 UI 的设置项是死字段。
 
-长任务不要把 `execute` 阻塞到结束。官方[工具编写参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-tool.zh.md)要求用 `ctx.jobs.start`，成功的后台分支返回 `{ kind: 'background', jobId }`；约定见[后台任务运行时](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/jobs.zh.md)。
+长任务不要把 `execute` 阻塞到结束。官方[工具编写参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-tool.zh.md)要求用 `ctx.jobs.start`，成功的后台分支返回 `{ kind: 'background', jobId }`；约定见[后台任务运行时](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/jobs.zh.md)。若刻意不用官方 jobs、改用 overlay + 产物文件判定完成，必须写明原因，并处理 `process.kill(pid, 0)` 的 pid 复用：核对 `ps` 命令行是否仍是本插件脚本，不能只看 pid 还活着。detached 预览/浏览器进程还要有磁盘登记，Harness 重启后才能回收孤儿。
 
 官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 的 Remote 只处理一元请求和一元结果，没有推送。磁盘或任务要近实时，就在 Host 失效缓存并增加 `revision`，Client 轮询廉价状态方法。
 
@@ -208,7 +208,7 @@ node "$SKILL_DIR/scripts/check_plugin.mjs" /path/to/plugin
 dsh --profile <name> --dump-config
 ```
 
-`SKILL_DIR` 是本 Skill 的安装目录。契约（方法名、zod schema、`dsh.client.inject`、patch 行）变了必须重启 Harness 进程，再硬刷新浏览器；只改已有方法内部实现时，重建 `lib/` 通常就够。
+`SKILL_DIR` 是本 Skill 的安装目录。契约（方法名、zod schema、`dsh.client.inject`、patch 行）变了必须重启 Harness 进程，再硬刷新浏览器；只改已有方法内部实现时，重建 `lib/` 通常就够。`file:` 安装时确认 profile 里的附属脚本（例如 `collect-publish.mjs`）与源码 inode/体积一致，不要只看 Host `lib/index.js`。
 
 然后检查：
 
