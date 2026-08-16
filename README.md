@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-4D6BFE?style=flat-square"></a>
-  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4D6BFE?style=flat-square">
+  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.5-4D6BFE?style=flat-square">
 </p>
 
 # build-deepseek-harness-plugin
@@ -16,6 +16,14 @@
 An agent skill for **installed** DeepSeek Harness plugins. It tells the agent how to assemble a TypeScript bundle, pick a public slot, mount a Typert remote, store secrets in official credentials, and prove the plugin actually loaded.
 
 Official first-plugin tutorials stay the source for the first mile. This skill adds the reload, layout, and credential rules that show up after you ship a real bundle.
+
+Read these official pages first:
+
+- [Your first plugin](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.md)
+- [Build a tool](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.md)
+- [Package and install](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md)
+- [Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.md)
+- [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.md)
 
 The whale mark is the official DeepSeek Harness logo from the [Harness website assets](https://github.com/deepseek-ai/deepseek-harness/blob/master/website/public/favicon.svg).
 

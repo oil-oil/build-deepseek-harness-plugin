@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-4D6BFE?style=flat-square"></a>
-  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.6-4D6BFE?style=flat-square">
+  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.5-4D6BFE?style=flat-square">
 </p>
 
 # build-deepseek-harness-plugin
@@ -16,6 +16,14 @@
 给 Agent 用的 skill，面向**已安装**的 DeepSeek Harness 插件。它说明怎么装配 TypeScript 组合包、选公开 Slot、挂 Typert Remote、把密钥放进官方凭据，以及怎么证明插件真的加载了。
 
 官方入门教程仍是第一英里的依据。这份补的是真正发出去一个组合包之后才会碰到的重载、布局和凭据规则。
+
+先读这些官方页面：
+
+- [第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)
+- [开发一个工具](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.zh.md)
+- [打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)
+- [Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)
+- [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)
 
 鲸鱼标志来自 [Harness 网站资源](https://github.com/deepseek-ai/deepseek-harness/blob/master/website/public/favicon.svg) 里的官方 logo。
 

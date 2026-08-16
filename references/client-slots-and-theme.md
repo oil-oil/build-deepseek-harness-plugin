@@ -12,13 +12,13 @@
 - [Client 模块与 HMR](#client-模块与-hmr)
 - [UI 验收](#ui-验收)
 
-官方依据：[Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)、[Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)、[Slot Catalog 源码](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)、[Theme 服务](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-theme/README.zh.md)、[Web UI 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.zh.md)。`master` 只用于导航；Slot、props、Token 和事件名称以目标 commit 的生成 Catalog、公开类型与运行时为准。
+官方依据：[Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)、[Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)、[Slot Catalog 源码](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)、[Theme 服务](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-theme/README.zh.md)、[Web UI 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.zh.md)、[UI primitives](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/README.zh.md)、官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)。`master` 只用于导航；Slot、props、Token 和事件名称以目标 commit 的生成 Catalog、公开类型与运行时为准。
 
 ## Slot 的本质
 
-Slot 是 Harness 主动留出的 UI 扩展位。插件注册一个 React 组件，宿主决定它何时挂载、传入哪些属性，以及它是新增、替换还是按 key 分发。
+Slot 是 Harness 主动留出的 UI 扩展位。插件注册一个 React 组件，宿主决定它何时挂载、传入哪些属性，以及它是新增、替换还是按 key 分发。官方 [Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)写明：Slot 属于浏览器侧 UI 接线，不进入模型请求。
 
-不要根据截图猜 Slot。以当前 Harness 的 [`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts) 为准。
+不要根据截图猜 Slot。以当前 Harness 的 [`packages/extensions/cordis-client-runner/src/client/slot-catalog.ts`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts) 为准。官方动态插件 Skill 也要求先查 live subtree，再选最窄入口；不要默认替换 `root`、`sidebar`、`conversation` 或 `details`。
 
 Catalog 通常会给出：
 
@@ -44,7 +44,15 @@ Catalog 通常会给出：
 | `sidebar.footer.action` | 侧栏底部短操作 | 优先于替换整列 sidebar |
 | `details` | 官方工具行详情列 | 不要为自定义面板调用 `layout.openDetails` |
 
-如果功能需要预览、多个分组或复杂交互，优先 `settings.section`；只有一个开关时使用 `settings.general.item`。`settings.plugin.item` 是插件清单里的一张卡，不是功能列表。自定义检查器走 `shell.overlay`。调用 `layout.openDetails` 会打开官方空「详情」列。
+如果功能需要预览、多个分组或复杂交互，优先 `settings.section`；只有一个开关时使用 `settings.general.item`。`settings.plugin.item` 是插件清单里的一张卡，不是功能列表。
+
+官方 Catalog 对布局槽位的约定：
+
+- `shell.overlay`：list、可叠加、位于所有列之上；层本身穿透点击，条目自己选择是否接收指针。官方动态插件 Skill 也要求 toast、状态条和框架级浮层先查这个槽。
+- `details`：single，被官方对话详情面板占用；`ctx.layout` 只负责这列开不开。调用 `layout.openDetails` 打开的是这列官方详情，不是插件检查器。
+- `sidebar`：single，替换整列会丢掉它声明的子座。要加短操作，优先 `sidebar.footer.action`。
+
+自定义检查器走 `shell.overlay`。
 
 ## 公开 UI 边界
 
@@ -67,8 +75,8 @@ Slot Catalog 公开的是挂载协议，不代表宿主内部 React 组件也可
 
 公开控件还有产品边界：
 
-- `MarkdownText` 只加载 HTTP(S) 图片。`file:` 或磁盘相对路径不会渲染；本地图要自己起静态服务再改写 URL。
-- 内置 `@` mention 芯片按默认短路径序列化。自定义 XML 会被官方芯片样式裁切。
+- 官方 [UI primitives](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/README.zh.md)：`MarkdownText` 只渲染绝对 HTTP(S) 图片；相对路径、本地绝对路径和 `file:` 只保留 alt。本地图要自己起静态服务再改写 URL。
+- 内置 `@` mention 芯片按默认短路径序列化。自定义 XML 会被官方芯片样式裁切。这是产品控件边界，不是 Catalog 字段。
 - 用 `padding-left` 等给对话让位时，浮层关闭必须清掉；残留占位是检查器常见回归。
 
 ## 注册模式

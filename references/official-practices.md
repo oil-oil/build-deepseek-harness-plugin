@@ -10,6 +10,7 @@
 - [先区分两类插件](#先区分两类插件)
 - [插件与生命周期](#插件与生命周期)
 - [Config 官方契约](#config-官方契约)
+- [工具与长任务](#工具与长任务)
 - [能力 seam 与依赖](#能力-seam-与依赖)
 - [bundle、profile 与配置层](#bundleprofile-与配置层)
 - [Web Client 与样式](#web-client-与样式)
@@ -20,21 +21,32 @@
 ## 官方入口
 
 - [官方仓库](https://github.com/deepseek-ai/deepseek-harness)
+- [官方根 README](https://github.com/deepseek-ai/deepseek-harness/blob/master/README.zh.md)
 - [第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)
+- [开发一个工具](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.zh.md)
 - [插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/config.zh.md)
 - [打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)
+- [插件与生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/index.zh.md)
+- [服务与依赖](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/service.zh.md)
 - [Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)
 - [能力的三种角色设计](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/practice/index.zh.md)
 - [扩展插件形态实操手册](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/extension-cookbook.zh.md)
+- [工具编写参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-tool.zh.md)
+- [后台任务运行时](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/jobs.zh.md)
 - [Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)
 - [Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)
 - [Slot Catalog 源码](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)
 - [Theme 服务](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-theme/README.zh.md)
 - [Web UI 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.zh.md)
+- [UI primitives](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-primitives/README.zh.md)
 - [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)
 - [Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)
+- [本地凭据提供方](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/credentials/credentials-local/README.zh.md)
+- [配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)
 - [Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)
 - [API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)
+- [Typert 远程调用](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/typert.zh.md)
+- [官方动态插件 Skill](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)
 - [测试策略](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/testing.zh.md)
 - [防御性模式](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/defensive-patterns.zh.md)
 
@@ -44,14 +56,17 @@
 
 | 实践 | 优先证据 |
 | --- | --- |
-| 插件生命周期、`inject`、effect 与 disposer | Cordis 入门、`docs/cordis-api/`、目标提交源码 |
+| 插件生命周期、`inject`、effect 与 disposer | 插件与生命周期、Cordis 入门、`docs/cordis-api/`、目标提交源码 |
 | Config、bundle、profile 与 patch 层 | 插件配置、打包与安装 |
+| 面向模型的工具、`defineTool`、后台任务 | 开发一个工具、工具编写参考、后台任务运行时 |
+| 会话内动态包 | 官方 `cordis-plugin-development` Skill |
 | Client boot graph、bundle URL、revision 与 HMR | Client 模块、`packages/client/modules` |
 | Slot 类型、scope、props、占用与替换风险 | 目标提交生成的 Slot Catalog、Client Slot 注册表 |
+| `MarkdownText` 图片与链接策略 | UI primitives README |
 | Theme API、Token 与样式职责 | Theme 服务、Web UI 样式规范、目标提交类型定义 |
 | Settings 暴露范围与 revision 写入 | Settings、Web API Proxy、`settings.describe` 实际结果 |
-| Credentials 只写边界 | Credentials、Web API Proxy |
-| Client→Host Remote | API Gateway、目标业务包生成的 `/remote` 贡献 |
+| Credentials 只写、文件路径与 env 遮蔽 | Credentials、本地凭据提供方、配置模型、Web API Proxy |
+| Client→Host Remote | API Gateway、Typert 远程调用、目标业务包生成的 `/remote` 贡献 |
 | 测试与资源清理 | 测试策略、防御性模式 |
 
 ## 证据优先级
@@ -72,11 +87,11 @@
 | 动态 Cordis Plugin/Package | 在 Harness 会话中快速定义、运行、更新和回滚 | Host/Client 是纯 JavaScript 函数体；先通过 Inspect Provider 查询真实 API；不能使用 import、JSX 或 TypeScript |
 | 可分发组合包 | 通过 npm、tarball 或 GitHub 安装到 profile | 需要 `package.json`、`dsh.bundle`、Cordis patch、Host 入口；Web 插件还要提供 ModuleLoader Client bundle |
 
-本 Skill 默认处理可分发组合包。若任务明确使用 `cordis_define` / `cordis_run`，先读取官方内置 `cordis-plugin-development` Skill，不要把两套产物格式混用。
+本 Skill 默认处理可分发组合包。若任务明确使用 `cordis_define` / `cordis_run`，先读取官方内置 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)，不要把两套产物格式混用。官方[第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)用 `--patch` 加载本地源码；把它变成可安装组合包的官方路径是[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。官方仓库内的[添加 workspace 包](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-package.zh.md)只适用于 Harness monorepo，不是第三方组合包教程。
 
 ## 插件与生命周期
 
-官方依据：[Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)、[Fiber API](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-api/fiber.zh.md)。
+官方依据：[插件与生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/index.zh.md)、[Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)、[Fiber API](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-api/fiber.zh.md)。
 
 - 插件可使用函数、对象或 Service 类三种形态；普通扩展优先函数形态，提供可替换服务时再考虑 Service 类。
 - 硬依赖写入 `inject`。依赖缺失时 fiber 保持 `PENDING`，不是“成功但没有输出”。可选依赖使用 `ctx.get(name)` 并处理 `undefined`。
@@ -105,6 +120,16 @@ export const Config: Schema<Config> = Schema.object({
 - 默认值和约束写入 Schema，让无效配置在加载时响亮失败。
 - 不同部署可能变化的值必须成为配置字段，不能写死在实现中。
 - 跨字段约束优先使用 Settings/服务公开的校验入口，不要存入一个 owner 无法执行的状态。
+
+## 工具与长任务
+
+官方依据：[开发一个工具](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.zh.md)、[工具编写参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-tool.zh.md)、[后台任务运行时](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/jobs.zh.md)、[Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)。
+
+- 第一方工具用 `ctx.tools.register(defineTool({...}))`；`inject` 等待 `tools` 就绪。`defineTool` 根据 `parameters` 校验 `args`，`execute` 返回 `output.schema` 声明的规范值。
+- 注册是 fiber 上的副作用：dispose 插件即注销工具。schema 会自动进入系统提示词组装。
+- Slot 注册表属于浏览器 UI 接线，不进入模型请求。面向人的界面走 Slot，面向模型的能力走工具。
+- 长任务走 `ctx.jobs.start({ kind, label, owner, run })`。成功的后台分支返回类型化句柄 `{ kind: 'background', jobId }`，不要把 `execute` 阻塞到工作结束。发布 id 之后用任务自有取消信号，而不是继续绑在 `exec.signal` 上。
+- 文件工作台把磁盘当产品真源、用 Remote `revision` 轮询刷新，是本 Skill 的项目约定，不能代替官方 `ctx.jobs`。
 
 ## 能力 seam 与依赖
 
@@ -169,6 +194,7 @@ export const Config: Schema<Config> = Schema.object({
 
 - 目标 commit、包版本和 profile 名称。
 - Config、Service、Event、Slot、Theme Token 的实际类型和 Catalog。
+- `defineTool`、`ctx.jobs` 与工具 schema 是否仍按官方教程进入系统提示。
 - Web ModuleLoader 共享模块表与 Client bundle 的真实 `require(...)`。
 - Settings namespace 是否向 Web 暴露，Credentials 的 describe/set/resolve 契约。
 - 独立安装包的 `/remote` contribution 是否会被 Client 组合发现并挂载。

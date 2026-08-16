@@ -13,7 +13,7 @@
 - [如何判断安装成功](#如何判断安装成功)
 - [故障排查顺序](#故障排查顺序)
 
-官方依据：[Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)、[Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)、[Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)、[API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)、[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。`master` 只用于导航；namespace 暴露范围、Remote 生成方式和 wire 契约以目标 commit 与实际运行时为准。
+官方依据：[Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)、[Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)、[本地凭据提供方](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/credentials/credentials-local/README.zh.md)、[配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)、[Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)、[API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)、[Typert 远程调用](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/typert.zh.md)、[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。`master` 只用于导航；namespace 暴露范围、Remote 生成方式和 wire 契约以目标 commit 与实际运行时为准。
 
 ## 先选择状态范围
 
@@ -95,7 +95,7 @@ Host 注册服务不等于 Client 自动获得 `ctx.remote.<namespace>`。开始
 
 若目标版本不允许外部插件可靠挂载自己的 Remote，选择浏览器本地持久化、已有公开 Settings namespace，或向 Harness 提交通用扩展点；不要用私有 HTTP 路由、DOM 通道或修改 Host 白名单冒充官方 Remote。
 
-独立仓库也可以手写 invocation descriptor（zod codec + `TypertRemoteService`），再导出 `./typert` 并在 Client 里 `ctx.remote.$mount(...)`。这是已验证的项目约定，不是 monorepo 生成器的替代文档。Host 与 Client 必须同一套方法与 schema。改契约后要重建两端、**重启** `dsh` 进程，再硬刷新浏览器。Typert 没有推送：Host 失效扫描缓存并增加 `revision`，Client 轮询廉价状态。Gateway 打到 Cordis 代理，Remote 服务不要用 `#private` 字段。
+独立仓库也可以手写 invocation descriptor（zod codec + `TypertRemoteService`），再导出 `./typert` 并在 Client 里 `ctx.remote.$mount(...)`。这是已验证的项目约定，不是官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 生成流水线的替代文档。Host 与 Client 必须同一套方法与 schema。改契约后要重建两端、**重启** `dsh` 进程，再硬刷新浏览器。官方 Gateway 只处理一元请求和一元结果，没有推送；磁盘或任务要近实时，就由 Host 失效缓存并增加 `revision`，Client 轮询廉价状态。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段，官方文档没有单独写这条。
 
 本地开发可以把 `lib/` hardlink 或 `file:` 链到 `$DSH_HOME/profiles/<name>/node_modules/<pkg>`，这样 `pnpm build` 会更新运行树。只改已有方法内部实现通常不必重启；改 schema / 方法名 / `dsh.client.inject` / patch 行必须重启。
 
@@ -114,7 +114,7 @@ Client 能从连接层 `settings.describe` 看到目标 namespace 后，仍要�
 
 ## Credentials 安全边界
 
-API Key、Token 和密码使用 Harness Credentials，不放入普通 Settings：
+API Key、Token 和密码使用 Harness Credentials，不放入普通 Settings。官方[凭据](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)与[配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)的约定：
 
 ```text
 Client API credentials.describe(refs)
@@ -130,11 +130,11 @@ Host ctx.credentials.resolve(credentialRef(ref))
 要求：
 
 - 输入框默认空白，只显示“已配置”状态，不把旧 Key 回传浏览器。
-- Key 不进入 Settings、`localStorage`、URL、日志、错误详情、遥测和会话记录。
-- Host 在最后使用点解析 Key，不把明文长期放进可序列化配置或缓存。
+- Key 不进入 Settings、`localStorage`、URL、日志、错误详情、遥测和会话记录。官方用户指南写明：页面只会收到脱敏描述符，settings 只保留凭据引用，值落在 `$DSH_HOME/.credentials.yaml`。
+- Host 在每个操作的最后使用点重新解析，不跨操作缓存明文。
 - UI 检查 `writable`，只读来源不得显示虚假的保存成功。
-- 进程环境变量盖住 `$DSH_HOME/.credentials.yaml` 且只读；来源是 env 时不要假装 `set` 成功。
-- 直接改 `.credentials.yaml` 合法，权限保持 `0600`。本地提供方会热加载；徽章仍旧时重新打开设置卡。
+- 官方[本地凭据提供方](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/credentials/credentials-local/README.zh.md)：进程环境盖住 `$DSH_HOME/.credentials.yaml`；来源是 `env` 时 `describe` 报 `writable: false`，`set`/`unset` 直接拒绝。
+- 直接改 `.credentials.yaml` 合法。官方提供方以 `0600` 创建或原子替换文档，默认 `watch: true` 热发布外部编辑；徽章仍旧时重新打开设置卡。启动之后才 export 的环境变量不会进入解析，要换 env 凭据必须重启。
 
 Credentials 与 Settings 属于两个独立事务，不能宣称原子保存。顺序由依赖关系决定：
 
@@ -154,7 +154,7 @@ Credentials 与 Settings 属于两个独立事务，不能宣称原子保存。�
 
 ## GitHub 安装发布
 
-官方依据：[打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。先选择交付模型：
+官方依据：[打包与安装插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)、[官方根 README](https://github.com/deepseek-ai/deepseek-harness/blob/master/README.zh.md)。先选择交付模型：
 
 | 模型 | 作者提供 | 用户侧要求 |
 | --- | --- | --- |
@@ -163,10 +163,11 @@ Credentials 与 Settings 属于两个独立事务，不能宣称原子保存。�
 | Git 源码构建 | 自包含 `prepare`，不能依赖旁边的 monorepo | pnpm ≥10 需要在 profile 的 `pnpm-workspace.yaml` 授权 `allowBuilds` |
 | Git 仓库自带产物 | 提交并跟踪 `lib/`，入口不依赖安装期构建 | 直接 GitHub 安装；这是已验证项目约定，不是官方教程主路径 |
 
-`prepare` 会在 agent 沙箱之外执行。用户只能对可信源码授权，并应在可复现或高安全环境锁定 commit：
+`prepare` 会在 agent 沙箱之外执行。用户只能对可信源码授权，并应在可复现或高安全环境锁定 commit。官方教程写的是 `dsh plugin`；官方根 README 的 npm 入口是 `npx @deepseek-ai/dsh`：
 
 ```bash
-npx @deepseek-ai/dsh plugin --profile web add github:owner/repository#<sha>
+dsh plugin --profile <name> add github:owner/repository#<sha>
+npx @deepseek-ai/dsh plugin --profile <name> add github:owner/repository#<sha>
 ```
 
 若采用 `prepare`，profile 中需要按 pnpm 报出的确切包键配置：
@@ -206,10 +207,16 @@ README 至少写清：
 - 数据保存位置
 - 已知限制
 
-安装：
+安装。官方教程示例 profile 是 `demo`；把 `<name>` 换成用户实际 profile：
 
 ```bash
-npx @deepseek-ai/dsh plugin --profile web add github:owner/repository
+dsh plugin --profile <name> add github:owner/repository
+```
+
+未全局安装 CLI 时用同一包的 npx 入口：
+
+```bash
+npx @deepseek-ai/dsh plugin --profile <name> add github:owner/repository
 ```
 
 面向普通用户可以保留无 SHA 的简洁命令，同时在安全或可复现章节给出锁定 SHA 的形式。安装后重启 Harness。若同名包已经存在或 GitHub 内容未更新，先用当前 CLI 支持的 remove 命令移除，再 add，以刷新 git tarball 和 lockfile；不要手动删除 profile 内随机目录。

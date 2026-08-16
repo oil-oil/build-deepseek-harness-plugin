@@ -14,7 +14,7 @@
 - [CSS](#css)
 - [构建产物检查](#构建产物检查)
 
-官方依据：[Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)、[插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/config.zh.md)、[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)、[Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)。`master` 只用于导航；包字段、构建入口和 ModuleLoader 共享模块以目标 commit 与构建产物为准。
+官方依据：[第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)、[插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/config.zh.md)、[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)、[Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)、[Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)。`master` 只用于导航；包字段、构建入口和 ModuleLoader 共享模块以目标 commit 与构建产物为准。
 
 ## 推荐目录
 
@@ -35,7 +35,7 @@ example-plugin/
 └── tests/
 ```
 
-`lib/` 是发布产物。若主要通过 `github:owner/repo` 安装，应将它提交进 Git。
+`lib/` 是 TypeScript 包的发布产物。官方[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)的最小示例可以直接发布 `index.js`；Git 源码安装若还要构建，官方要求自包含 `prepare`。把 `lib/` 提交进仓库、让入口无需安装期构建，是本 Skill 验证过的项目约定，不是官方主路径。
 
 ## package.json
 
@@ -182,7 +182,7 @@ GitHub profile 的组合根包可能没有直接声明插件 peer，因此 pnpm 
 - 替换插件保留必要的 provider、Settings schema 和能力契约，而不是保留官方内部 ID。
 - 需要定位插入位置时，先检查当前版本已有 patch 结构，不要盲猜。
 
-本地源码开发可以使用 `--patch` overlay。patch 不会改变模块解析基准，因此引用 checkout 内源码时使用绝对路径：
+本地源码开发使用官方[第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)的 `--patch` overlay。patch 不会改变模块解析基准，因此引用 checkout 内源码时使用绝对路径：
 
 ```yaml
 - insert:

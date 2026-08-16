@@ -14,15 +14,19 @@ description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harnes
 先读 [official-practices.md](references/official-practices.md)。其中区分官方契约、目标版本源码事实和本 Skill 的项目约定。常用官方入口：
 
 - [第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)
+- [开发一个工具](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.zh.md)
 - [插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/config.zh.md)
 - [打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)
-- [Cordis 入门与生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)
+- [插件与生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/index.zh.md)
+- [Cordis 入门](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cordis-primer.zh.md)
 - [能力的三种角色设计](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/practice/index.zh.md)
 - [扩展插件形态实操手册](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/extension-cookbook.zh.md)
 - [Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)
 - [Web UI 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.zh.md)
 - [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)
 - [Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)
+- [API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)
+- 会话内动态包走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)
 
 `master` 链接只用于导航。目标版本源码、公开类型和生成的 Catalog 优先于在线文档；版本观察必须记录 commit，不能写成永久 API。
 
@@ -51,7 +55,7 @@ description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harnes
 - 当前 profile 使用的 DeepSeek Harness 版本
 - 当前 Web 平台实际注册到 ModuleLoader 的共享模块表
 
-动态插件通过 `cordis_define` / `cordis_run` 交付纯 JavaScript Package，不能使用 import、JSX 或 TypeScript；可分发插件通过 `dsh.bundle` 安装到 profile。不要混用两套产物格式。会话内动态包改走官方 `cordis-plugin-development`。
+动态插件通过 `cordis_define` / `cordis_run` 交付纯 JavaScript Package，不能使用 import、JSX 或 TypeScript；可分发插件通过 `dsh.bundle` 安装到 profile。不要混用两套产物格式。会话内动态包改走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)。
 
 ## 先判断插件类型
 
@@ -82,11 +86,11 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 - `src/index.ts`：Host 入口；Client-only 时可以是无副作用的空实现。
 - `src/client/index.tsx`：浏览器插件入口。
 
-若插件接受配置，同时导出 `Config` 类型与同名 Schemastery Standard Schema；默认值和约束写进 Schema，让无效配置在加载时失败。不同部署可能变化的参数不得硬编码。
+若插件接受配置，同时导出 `Config` 类型与同名 Schemastery Standard Schema；默认值和约束写进 Schema，让无效配置在加载时失败。不同部署可能变化的参数不得硬编码。这是官方[插件配置](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/config.zh.md)契约。
 
 按 [package-and-build.md](references/package-and-build.md) 建立结构。Cordis patch 的 `name` 与安装包名一致，ModuleLoader ID 与包名精确一致；Cordis patch 的 `id` 只需在组合树中唯一，可以使用不带 scope 的短 ID。
 
-插件包声明 `dsh.bundle`，用户 profile 声明 `dsh.profile`；一个包不能同时承担两者。patch 覆盖已有行时会替换整段 `config`，不会深合并。安装后先执行 `dsh --profile <name> --dump-config` 核对最终组合。
+插件包声明 `dsh.bundle`，用户 profile 声明 `dsh.profile`；一个包不能同时承担两者。patch 覆盖已有行时会替换整段 `config`，不会深合并。安装后先执行 `dsh --profile <name> --dump-config` 核对最终组合。见官方[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。
 
 ### 2. 分清四层依赖
 
@@ -109,19 +113,17 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 
 值导入才会形成 bundle `require(...)`；`import type` 编译后消失。实际 `require(...)` 必须存在于当前 Web 平台共享模块表中，但不要求与 `dsh.client.inject` 一一相等。不要复制另一个大型插件的整份依赖清单。详见 [package-and-build.md](references/package-and-build.md)。
 
-硬依赖写入 `inject`；可选能力使用 `ctx.get()` 并处理缺失。通过 Cordis API 建立的监听、服务、工具和子插件已经属于 effect；只有外部连接、watcher、第三方订阅等 Cordis 不管理的资源才包进 `ctx.effect()`。异步 disposer 必须等待资源真正停稳；严格的清理顺序放进同一个 effect。
+硬依赖写入 `inject`；可选能力使用 `ctx.get()` 并处理缺失。通过 Cordis API 建立的监听、服务、工具和子插件已经属于 effect；只有外部连接、watcher、第三方订阅等 Cordis 不管理的资源才包进 `ctx.effect()`。异步 disposer 必须等待资源真正停稳；严格的清理顺序放进同一个 effect。见官方[插件与生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/index.zh.md)。
 
-### 2b. 工作台类插件的数据边界
+### 2b. 工具、长任务与工作台数据
 
-做侧栏列表、检查器、本地资料库这类界面时，先定谁拥有数据：
+面向模型的工具走官方[开发一个工具](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/tool.zh.md)：`ctx.tools.register(defineTool({...}))`。`defineTool` 的 schema 会进入系统提示；Slot 是浏览器 UI 接线，[官方 Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)写明它不进入模型请求。工具给人的模型调用，Slot 给人点；两者共用同一个 Host 服务，不要长成两套模型。没进 system prompt、工具结果或 UI 的设置项是死字段。
 
-- 产品正文在磁盘（或另一个明确的外部所有者）。
-- overlay / 插件状态只记工作台标记，不复制一份目录。
-- `ctx.tools.register` 给模型调用；Slot 给人点。两者共用同一个 Host 服务，不要长成两套模型。
-- 长任务立刻返回；完成与否看文件夹产物或可轮询的 job 记录，不要把工具调用阻塞到结束。
-- 不要为「给模型用」增加没有注入点的字段。没进 system prompt、工具结果或 UI 的设置项是死字段。
+长任务不要把 `execute` 阻塞到结束。官方[工具编写参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-tool.zh.md)要求用 `ctx.jobs.start`，成功的后台分支返回 `{ kind: 'background', jobId }`；约定见[后台任务运行时](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/jobs.zh.md)。
 
-Typert 是一元 JSON，没有推送到页面。磁盘或任务要近实时，就在 Host 失效缓存并增加 `revision`，Client 轮询廉价状态方法。Gateway 打到 Cordis 代理：Remote 服务上不要用 `#private` 字段。
+官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 的 Remote 只处理一元请求和一元结果，没有推送。磁盘或任务要近实时，就在 Host 失效缓存并增加 `revision`，Client 轮询廉价状态方法。
+
+下面是文件工作台的项目约定，不是官方 API：产品正文以磁盘（或另一个明确的外部所有者）为真源；overlay / 插件状态只记工作台标记，不复制一份目录。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段。
 
 ### 3. 通过 Slot 扩展 UI
 
@@ -144,7 +146,7 @@ ctx.slots.inject("settings.section", () =>
 );
 ```
 
-必须先 `slots.inject()`，因为 Slot 可能在插件加载后才被宿主声明。不要复用官方条目的 ID，除非目标就是替换该条目。自定义检查器走 `shell.overlay`，不要调用 `layout.openDetails`（那会打开官方空详情列）。替换整个 `sidebar` 时必须重声明它的子槽位。详见 [client-slots-and-theme.md](references/client-slots-and-theme.md)。
+必须先 `slots.inject()`，因为 Slot 可能在插件加载后才被宿主声明。不要复用官方条目的 ID，除非目标就是替换该条目。自定义检查器走官方 Catalog 里的 `shell.overlay`（list、可叠加、默认穿透点击）。不要调用 `layout.openDetails`：那会打开官方 `details` 列，该列由对话详情面板占用，不是插件检查器。替换整个 `sidebar` 时必须重声明它的子槽位，否则官方 Catalog 写明子座会随替换一起消失。详见 [client-slots-and-theme.md](references/client-slots-and-theme.md)。
 
 Slot 是公开扩展位，不代表宿主内部 React 组件也已公开。只从包的公开 `exports` 导入运行时组件，不 deep import 源码或未导出的官方卡片。优先复用公开 primitives 和语义 Token；确实没有公开组件时，才实现最小的插件自有外壳，并使用根类名隔离 CSS。
 
@@ -176,13 +178,13 @@ ctx.effect(() => () => release(), "release theme overrides");
 
 当前基线 commit 的 Web Settings RPC 使用显式暴露集合，第三方 Host Settings namespace 不会因注册而自动暴露给浏览器。不要只因 Host 注册成功就判断 Client 可以绑定。具体证据和降级路径见 [persistence-and-release.md](references/persistence-and-release.md)。
 
-普通设置遵循以下规则：
+普通设置遵循官方 [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md) 与 [Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)：
 
 - 使用路径级 `settings.mutate`，只修改插件拥有的字段，不覆盖整个 namespace。
 - 携带 `expectedRevision`；发生冲突时保留草稿并提示刷新，不盲目重试。
 - 只有插件确实替换并维护某个官方 schema 时，才可复用其已暴露 namespace。独立插件不得占用官方 namespace。
 
-API Key、Token 等敏感值必须进入 Harness Credentials：Client 只通过连接层公开的 `credentials.describe` 查看状态，通过 `credentials.set` 写入；Host 通过 `ctx.credentials.resolve(credentialRef(...))` 在每次操作的最后使用点解析。Key 是只写数据，禁止回显，也禁止进入 Settings、`localStorage`、日志和会话。
+API Key、Token 等敏感值必须进入 Harness Credentials。官方[凭据](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)与[配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)约定：Client 只通过 `credentials.describe` 查看状态，通过 `credentials.set` 写入；Host 在每次操作的最后使用点 `resolve`；页面永远收不到明文，settings 只保留引用。密钥落在 `$DSH_HOME/.credentials.yaml`。
 
 Credentials 与 Settings 是两个独立事务，不能伪造成原子保存。按依赖关系决定顺序：若 Settings 先创建 credential ref，先写 Settings；若设置校验要求凭据已经存在，先写 Credentials。后一步失败时保留已提交状态，只重试剩余步骤，并明确报告部分成功。
 
@@ -235,17 +237,17 @@ pnpm peer warning 只表示 profile 组合中的依赖声明不完整，不等�
 
 ### 8. 发布与安装
 
-官方支持三条路径：npm 预构建包、`pnpm pack` 生成的 tarball、Git 源码包。Git 源码安装若依赖构建，作者必须提供自包含 `prepare`，用户还要在 profile 的 `pnpm-workspace.yaml` 中通过 `allowBuilds` 授权安装期代码执行。
+官方[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)支持三条路径：npm 预构建包、`pnpm pack` 生成的 tarball、Git 源码包。Git 源码安装若依赖构建，作者必须提供自包含 `prepare`，用户还要在 profile 的 `pnpm-workspace.yaml` 中通过 `allowBuilds` 授权安装期代码执行。
 
 本 Skill 验证过另一种 GitHub 项目约定：把 `lib/index.js`、`lib/client.js` 和 Cordis patch 提交进仓库，使入口无需安装期构建即可运行。无论采用哪条路径，都要保证产物位于 `files` 中，并执行 `npm pack --dry-run` 或 `pnpm pack` 核对真正交付的文件。只通过 GitHub 发布时不必发布 npm 包。
 
-普通用户安装命令：
+官方教程里的安装命令是 `dsh plugin --profile <name> add github:owner/repository`。官方根 README 的 npm 入口是 `npx @deepseek-ai/dsh`，未全局安装 CLI 时写成：
 
 ```bash
-npx @deepseek-ai/dsh plugin --profile web add github:owner/repository
+npx @deepseek-ai/dsh plugin --profile <name> add github:owner/repository
 ```
 
-可复现或高安全安装使用 `github:owner/repository#<sha>` 锁定提交。`prepare` 在 agent 沙箱之外运行，只能对可信源码授权。安装后重启 Harness。完整的发布、重装和问题排查清单见 [persistence-and-release.md](references/persistence-and-release.md)。
+教程示例 profile 是 `demo`；`web` 只是常见产品 profile 名，不是官方默认值。可复现或高安全安装使用 `github:owner/repository#<sha>` 锁定提交。`prepare` 在 agent 沙箱之外运行，只能对可信源码授权。安装后重启 Harness。完整的发布、重装和问题排查清单见 [persistence-and-release.md](references/persistence-and-release.md)。
 
 ## 评审原则
 
