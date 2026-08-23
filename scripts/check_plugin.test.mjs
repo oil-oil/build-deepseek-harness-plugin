@@ -181,3 +181,73 @@ test("拒绝 Client 产物未被 files 覆盖", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("拒绝禁用官方 sidebar 后仍注入其 Client 模块", () => {
+  const root = fixture();
+  try {
+    updatePackage(root, (pkg) => {
+      pkg.dsh.client.inject.push("@deepseek-ai/dsh-client-ui-sidebar");
+    });
+    writeFileSync(
+      join(root, "cordis.patch.yml"),
+      "- id: ui-sidebar\n  disabled: true\n- insert:\n    - id: example-plugin\n      name: \"@example/plugin\"\n",
+    );
+    const result = run(root);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /Host patch 与 Client boot graph 是两层/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("拒绝通过 sidebar children 重声明子 Slot 时保留官方声明模块", () => {
+  const root = fixture();
+  try {
+    updatePackage(root, (pkg) => {
+      pkg.dsh.client.inject.push("@deepseek-ai/dsh-client-ui-sidebar");
+    });
+    writeFileSync(
+      join(root, "src", "client", "index.tsx"),
+      'ctx.slots.register({ name: "sidebar", children: { "sidebar.workspaces": { kind: "single", scope: "root" } } }, Sidebar);\n',
+    );
+    const result = run(root);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /请保证每个 Slot 只有一个声明者/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("提示 sidebar 替换可能漏掉官方子 Slot", () => {
+  const root = fixture();
+  try {
+    writeFileSync(
+      join(root, "cordis.patch.yml"),
+      "- id: ui-sidebar\n  disabled: true\n- insert:\n    - id: example-plugin\n      name: \"@example/plugin\"\n",
+    );
+    writeFileSync(
+      join(root, "src", "client", "index.tsx"),
+      'ctx.slots.register({ name: "sidebar" }, Sidebar);\n',
+    );
+    const result = run(root);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /未识别到 sidebar 子 Slot 重声明/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("提示依赖 Harness 内部对话 DOM", () => {
+  const root = fixture();
+  try {
+    writeFileSync(
+      join(root, "src", "client", "index.tsx"),
+      'document.querySelector("[data-conversation-scroll]");\n',
+    );
+    const result = run(root);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /应集中到一个可释放适配器/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

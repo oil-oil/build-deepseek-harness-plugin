@@ -4,6 +4,8 @@
 
 - [Slot 的本质](#slot-的本质)
 - [常见设置 Slot](#常见设置-slot)
+- [替换 single Slot 的所有权事务](#替换-single-slot-的所有权事务)
+- [独立 Surface 的 CSS 作用域](#独立-surface-的-css-作用域)
 - [公开 UI 边界](#公开-ui-边界)
 - [注册模式](#注册模式)
 - [Store 与组件动作](#store-与组件动作)
@@ -53,6 +55,44 @@ Catalog 通常会给出：
 - `sidebar`：single，替换整列会丢掉它声明的子座。要加短操作，优先 `sidebar.footer.action`。
 
 自定义检查器走 `shell.overlay`。
+
+## 替换 single Slot 的所有权事务
+
+替换 `sidebar`、`details` 等 single Slot 时，父组件、子 Slot 和声明它们的 Client 模块必须一起核对。Host Cordis patch 与 Client boot graph 是两层装配关系；禁用 Host 侧官方行不能证明其 Client 模块已经消失。
+
+按以下顺序执行：
+
+1. 从目标版本 Catalog 和官方实现记录父 Slot owner、全部子 Slot、props、scope 和声明模块。
+2. 写下替换前必须保留的能力清单，例如工作区、设置、底部操作、折叠与切换。
+3. 在插件 bundle patch 中禁用被替换的官方 Cordis 行。
+4. 若插件重声明官方子 Slot，从 `dsh.client.inject` 中移除仍会声明这些 Slot 的官方 Client 模块；不要让两个模块同时拥有同名 Slot。
+5. 插件按目标版本的真实 spec 重声明并渲染全部必要子 Slot。新增 Slot 也要显式记录，避免 Harness 升级后被自定义外壳吞掉。
+6. 完整重启 Harness，检查 boot manifest、Client load report 和控制台，确认没有 `already declared`，每个 Slot 只有一个声明者。
+7. 逐项验证替换前能力清单，并在卸载插件后确认官方 owner 自动恢复。
+
+不要只用源码字符串断言“调用了 `renderSlot`”作为完成证据。静态测试负责防止漏接，真实组合验收负责证明没有重复声明和能力回退。
+
+## 独立 Surface 的 CSS 作用域
+
+Slot、`shell.overlay`、Modal 和 Portal 可能挂载在彼此无祖先关系的 DOM 子树。每个独立 Surface 都必须在自己的根节点携带插件根类名或 `data-plugin="<package>"`，CSS 从这个本地根开始限定；不能假设外层 sidebar 或 settings 根节点会包住另一个 Surface。
+
+例如不要让 Overlay 只依赖：
+
+```css
+.exampleSidebar .inspector { /* Overlay 不是 sidebar 的后代时不会命中 */ }
+```
+
+应让 Overlay 自己拥有作用域：
+
+```tsx
+<div className="exampleInspector" data-plugin="example-plugin" />
+```
+
+```css
+[data-plugin="example-plugin"].exampleInspector { /* 当前 Surface 自包含 */ }
+```
+
+验收时分别挂载每个 Surface，检查背景、排版、交互状态和卸载恢复。运行时插入的 style 标签要更新已有节点并由 disposer 删除；写入宿主的 CSS 变量、padding 或 inset 也必须恢复原值。
 
 ## 公开 UI 边界
 
@@ -218,6 +258,9 @@ Web 包通过以下三项进入 boot graph：
 
 ## UI 验收
 
+- 每个独立 Surface 都在自己的根节点建立 CSS 作用域，不依赖另一个 Slot 的祖先。
+- 空态、加载态、错误态、选中态和主要切换均有真实页面证据。
+- 替换 single Slot 后，原能力清单逐项通过，Client load report 没有重复声明。
 - 设置弹窗与其他页面保持相同内容宽度、留白和滚动方式。
 - 颜色选择器、下拉框、输入框不溢出。
 - 文案在 100%、125%、150% 缩放下不重叠。
@@ -225,3 +268,5 @@ Web 包通过以下三项进入 boot graph：
 - 发送按钮、Tab、状态文字、用户消息等都通过语义 Token 联动。
 - 焦点态、禁用态、hover、selected 和错误态有足够对比度。
 - 卸载或禁用后恢复到原主题。
+
+若用户没有授权浏览器自动化，先完成构建、静态检查、boot manifest 和 Client load report 验证，再由用户人工确认视觉结果。交付说明必须区分“代码/运行时已验证”和“视觉已验证”，不能用单元测试代替后者。

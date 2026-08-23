@@ -148,7 +148,11 @@ ctx.slots.inject("settings.section", () =>
 
 必须先 `slots.inject()`，因为 Slot 可能在插件加载后才被宿主声明。不要复用官方条目的 ID，除非目标就是替换该条目。自定义检查器走官方 Catalog 里的 `shell.overlay`（list、可叠加、默认穿透点击）。不要调用 `layout.openDetails`：那会打开官方 `details` 列，该列由对话详情面板占用，不是插件检查器。替换整个 `sidebar` 时必须重声明它的子槽位，否则官方 Catalog 写明子座会随替换一起消失。详见 [client-slots-and-theme.md](references/client-slots-and-theme.md)。
 
+替换 `sidebar` 等 single Slot 是一次所有权迁移，不是只换一个 React 组件。先列出官方 owner、全部子 Slot 及声明它们的 Client 模块；再同时处理 Cordis patch 和 Client boot graph。禁用官方 Cordis 行不代表对应 Client 模块已经从 `dsh.client.inject` 消失。若插件要重声明 `sidebar.workspaces`、`sidebar.settings`、`sidebar.footer.action` 等子 Slot，必须移除仍会声明这些 Slot 的官方 Client 模块。完成后检查 boot manifest 和 Client load report，证明每个 Slot 只有一个声明者，并验证原工作区、设置和底部入口没有倒退。
+
 Slot 是公开扩展位，不代表宿主内部 React 组件也已公开。只从包的公开 `exports` 导入运行时组件，不 deep import 源码或未导出的官方卡片。优先复用公开 primitives 和语义 Token；确实没有公开组件时，才实现最小的插件自有外壳，并使用根类名隔离 CSS。
+
+每个独立挂载的 Slot、Overlay、Modal 或 Portal 都是一个单独的 CSS Surface，必须在自己的挂载根节点携带插件根类名或 `data-plugin` 作用域。不要依赖另一个 Slot 的祖先选择器；Portal 或 sibling Surface 不在那棵 DOM 子树里，样式会静默失效。运行时 style 标签、CSS 变量和对宿主布局施加的 inset 仍需由同一生命周期更新和释放。
 
 ### 4. 使用官方 Theme API
 
@@ -220,6 +224,8 @@ dsh --profile <name> --dump-config
 - 浅色、深色、窄窗口和长文案均正常。
 - 控制台和 Client load report 没有注入、Slot 或模块解析错误。
 - Client bundle 的 ModuleLoader ID 与包名一致，真实 `require(...)` 都由目标 Web 平台提供。
+
+涉及人可见 UI 时，把视觉验收当作完成条件：至少覆盖空态、加载态、错误态、选中态，以及此次修改直接影响的切换、按钮和官方入口；替换整列 UI 时再覆盖其原有能力清单。没有用户授权浏览器自动化时，先完成静态、构建和运行时检查，再请用户人工确认或明确标注“代码已验证，视觉尚未确认”。没有真实页面证据时，不宣称 UI 已完全修复。
 
 测试分四层：包内单测、源码面真实入口集成、构建产物 smoke、组合与人可见界面验收。不要只断言内部方法被调用；要验证最终文件、进程、manifest、事件或页面确实发生了预期变化。高风险生命周期和清理代码同时核对官方[测试策略](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/testing.zh.md)与[防御性模式](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/defensive-patterns.zh.md)。
 

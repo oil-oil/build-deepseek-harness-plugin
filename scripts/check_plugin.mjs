@@ -157,18 +157,19 @@ if (!mainPath) {
   checkPackaged(mainPath, "Host 产物");
 }
 
+let patchText = "";
 const patchPath = resolvePackagePath(pkg.dsh?.bundle?.patch);
 if (!patchPath) {
   addError("缺少 dsh.bundle.patch。");
 } else if (!existsSync(patchPath)) {
   addError(`Cordis patch 不存在：${relative(root, patchPath)}`);
 } else {
-  const patch = readText(patchPath) ?? "";
+  patchText = readText(patchPath) ?? "";
   addPassed(`Cordis patch 存在：${relative(root, patchPath)}`);
-  if (!/^\s*-\s+insert\s*:/m.test(patch)) {
+  if (!/^\s*-\s+insert\s*:/m.test(patchText)) {
     addWarning("Cordis patch 中没有找到顶层 insert，请确认装配结构符合目标版本。");
   }
-  if (pkg.name && !new RegExp(`\\bname\\s*:\\s*["']?${pkg.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']?\\s*$`, "m").test(patch)) {
+  if (pkg.name && !new RegExp(`\\bname\\s*:\\s*["']?${pkg.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']?\\s*$`, "m").test(patchText)) {
     addWarning(`Cordis patch 中未找到与包名一致的 name: ${pkg.name}。`);
   }
   checkTracked(patchPath, "Cordis patch");
@@ -279,6 +280,32 @@ const combinedSource = sources
   .map((path) => `\n// ${relative(root, path)}\n${readText(path) ?? ""}`)
   .join("\n");
 
+const clientInject = Array.isArray(client?.inject) ? client.inject : [];
+const officialSidebarClient = "@deepseek-ai/dsh-client-ui-sidebar";
+const officialSidebarInjected = clientInject.includes(officialSidebarClient);
+const officialSidebarDisabled = /^\s*-\s+id\s*:\s*["']?ui-sidebar["']?\s*$\n(?:^[ \t]+.*\n)*?^[ \t]+disabled\s*:\s*true\s*$/m.test(patchText);
+const declaresSidebarChildren = /["']sidebar\.(?:workspaces|settings|footer\.action)["']\s*:\s*\{\s*kind\s*:/.test(combinedSource);
+const replacesSidebar = /\bname\s*:\s*["']sidebar["']/.test(combinedSource);
+
+if (officialSidebarInjected && officialSidebarDisabled) {
+  addError(
+    `Cordis patch 已禁用 ui-sidebar，但 dsh.client.inject 仍包含 ${officialSidebarClient}；` +
+    "Host patch 与 Client boot graph 是两层，官方 Client 模块仍可能声明 sidebar 子 Slot 并造成冲突。",
+  );
+} else if (officialSidebarInjected && declaresSidebarChildren) {
+  addError(
+    `源码重声明了 sidebar 子 Slot，但 dsh.client.inject 仍包含 ${officialSidebarClient}；` +
+    "请保证每个 Slot 只有一个声明者。",
+  );
+}
+
+if (officialSidebarDisabled && replacesSidebar && !declaresSidebarChildren) {
+  addWarning(
+    "插件替换并禁用了官方 sidebar，但源码中未识别到 sidebar 子 Slot 重声明；" +
+    "请核对工作区、设置和底部操作是否会丢失。",
+  );
+}
+
 const hasConfigType = /export\s+(?:interface|type)\s+Config\b/.test(combinedSource);
 const hasConfigSchema = /export\s+const\s+Config\b/.test(combinedSource);
 if (hasConfigType && !hasConfigSchema) {
@@ -301,6 +328,13 @@ if (/credentials\s*\.\s*set\s*\(/.test(combinedSource) && /settings\s*\.\s*mutat
 
 if (/MutationObserver\s*\(/.test(combinedSource)) {
   addWarning("源码使用 MutationObserver。若它用于追踪 Harness 内部 DOM，请改用公开 Slot 或服务 API。");
+}
+
+if (/querySelector\s*\(\s*["']\[data-conversation-scroll\]["']\s*\)/.test(combinedSource)) {
+  addWarning(
+    "源码依赖 Harness 内部 DOM [data-conversation-scroll]。没有公开 inset API 时应集中到一个可释放适配器，" +
+    "并在关闭、卸载和状态切换时恢复原 padding、CSS 变量与监听。",
+  );
 }
 
 const readme = readText(join(root, "README.md"));
