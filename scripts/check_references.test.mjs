@@ -32,6 +32,25 @@ function run(root, harness) {
   return spawnSync(process.execPath, [checker, root, "--harness", harness], { encoding: "utf8" });
 }
 
+function runAt(root, harness, ref) {
+  return spawnSync(
+    process.execPath,
+    [checker, root, "--harness", harness, "--harness-ref", ref],
+    { encoding: "utf8" },
+  );
+}
+
+function commitHarness(harness) {
+  for (const args of [
+    ["init"],
+    ["add", "."],
+    ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixture"],
+  ]) {
+    const result = spawnSync("git", ["-C", harness, ...args], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  }
+}
+
 test("接受有效的相对链接、锚点和官方仓库文件", () => {
   const { root, harness } = fixture();
   try {
@@ -85,6 +104,34 @@ test("拒绝缺少路径的 --harness 参数", () => {
     const result = spawnSync(process.execPath, [checker, root, "--harness"], { encoding: "utf8" });
     assert.equal(result.status, 2, result.stdout + result.stderr);
     assert.match(result.stderr, /--harness 需要一个 checkout 路径/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(harness, { recursive: true, force: true });
+  }
+});
+
+test("按指定 Harness ref 核对官方路径", () => {
+  const { root, harness } = fixture();
+  try {
+    rmSync(join(harness, ".git"), { recursive: true, force: true });
+    commitHarness(harness);
+    const result = runAt(root, harness, "HEAD");
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /checkout @ HEAD/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(harness, { recursive: true, force: true });
+  }
+});
+
+test("拒绝仓库中不存在的 Harness ref", () => {
+  const { root, harness } = fixture();
+  try {
+    rmSync(join(harness, ".git"), { recursive: true, force: true });
+    commitHarness(harness);
+    const result = runAt(root, harness, "missing-ref");
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /--harness-ref 在仓库中不存在：missing-ref/);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(harness, { recursive: true, force: true });

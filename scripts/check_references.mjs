@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +9,7 @@ const ownRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 let root = ownRoot;
 let harness;
+let harnessRef;
 
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index];
@@ -18,6 +20,14 @@ for (let index = 0; index < args.length; index += 1) {
       process.exit(2);
     }
     harness = resolve(value);
+    index += 1;
+  } else if (arg === "--harness-ref") {
+    const value = args[index + 1];
+    if (!value || value.startsWith("--")) {
+      console.error("错误：--harness-ref 需要 commit、tag 或 branch。");
+      process.exit(2);
+    }
+    harnessRef = value;
     index += 1;
   } else if (arg.startsWith("--")) {
     console.error(`错误：未知参数 ${arg}`);
@@ -31,6 +41,27 @@ const errors = [];
 const warnings = [];
 let checkedLinks = 0;
 let checkedOfficial = 0;
+
+function git(args) {
+  if (!harness) return undefined;
+  return spawnSync("git", ["-C", harness, ...args], { encoding: "utf8" });
+}
+
+const harnessIsGit = harness !== undefined
+  && git(["rev-parse", "--is-inside-work-tree"])?.stdout.trim() === "true";
+const harnessRefExists = !harnessRef || !harnessIsGit
+  || git(["cat-file", "-e", `${harnessRef}^{commit}`])?.status === 0;
+const gitTreeCache = new Map();
+
+function gitPathsAt(ref) {
+  if (gitTreeCache.has(ref)) return gitTreeCache.get(ref);
+  const result = git(["ls-tree", "-r", "--name-only", ref]);
+  const paths = result?.status === 0
+    ? new Set(result.stdout.split(/\r?\n/).filter(Boolean))
+    : undefined;
+  gitTreeCache.set(ref, paths);
+  return paths;
+}
 
 function collectMarkdown(dir, output = []) {
   if (!existsSync(dir)) return output;
@@ -105,8 +136,14 @@ function checkOfficialTarget(source, target) {
     errors.push(`${relative(root, source)}：官方链接缺少仓库文件路径：${target}`);
     return;
   }
+  const urlRef = decodeURIComponent(rest.slice(0, slash));
   const repoPath = decodeURIComponent(rest.slice(slash + 1));
-  if (harness && !existsSync(join(harness, repoPath))) {
+  if (harness && harnessIsGit) {
+    const ref = harnessRef ?? urlRef;
+    if (harnessRefExists && !gitPathsAt(ref)?.has(repoPath)) {
+      errors.push(`${relative(root, source)}：官方仓库 ${ref} 中不存在：${repoPath}`);
+    }
+  } else if (harness && !existsSync(join(harness, repoPath))) {
     errors.push(`${relative(root, source)}：官方仓库中不存在：${repoPath}`);
   }
 }
@@ -139,14 +176,21 @@ if (!existsSync(skillPath)) {
   }
 }
 
-if (harness && !existsSync(join(harness, ".git"))) {
-  warnings.push(`--harness 不是可识别的 Git checkout：${harness}`);
+if (harness && !harnessIsGit) {
+  warnings.push(`--harness 不是可识别的 Git checkout；仅按工作树路径核对：${harness}`);
+}
+if (harnessRef && !harness) {
+  errors.push("--harness-ref 必须与 --harness 一起使用。");
+} else if (harnessRef && harnessIsGit && !harnessRefExists) {
+  errors.push(`--harness-ref 在仓库中不存在：${harnessRef}`);
 }
 
 console.log(`Skill 引用检查：${root}`);
 console.log(`  Markdown：${markdown.length} 个`);
 console.log(`  链接：${checkedLinks} 个`);
-console.log(`  官方 Harness 文件链接：${checkedOfficial} 个${harness ? "（已映射本地 checkout）" : "（未映射本地 checkout）"}`);
+console.log(
+  `  官方 Harness 文件链接：${checkedOfficial} 个${harness ? `（已映射本地 checkout${harnessRef ? ` @ ${harnessRef}` : ""}）` : "（未映射本地 checkout）"}`,
+);
 for (const item of warnings) console.log(`  ! ${item}`);
 for (const item of errors) console.log(`  ✗ ${item}`);
 console.log(`\n结果：${errors.length} 个错误，${warnings.length} 个警告。`);

@@ -5,7 +5,7 @@
 - [推荐目录](#推荐目录)
 - [package.json](#packagejson)
 - [Config Schema](#config-schema)
-- [四层依赖模型](#四层依赖模型)
+- [五层依赖模型](#五层依赖模型)
 - [Cordis patch](#cordis-patch)
 - [bundle、profile 与配置层](#bundleprofile-与配置层)
 - [Host 入口](#host-入口)
@@ -124,7 +124,7 @@ export function apply(ctx: Context, config: Config): void {
 - 默认值与单字段约束写入 Schema；无效配置应在插件加载时明确失败。
 - 不同部署可能变化的端口、超时、路径、模式和开关都应配置化。
 
-## 四层依赖模型
+## 五层依赖模型
 
 ### 1. Client Cordis 服务
 
@@ -136,31 +136,64 @@ export const inject = ["slots", "locale", "connection"];
 
 表示组件运行时要从 Cordis Context 取得哪些服务。这里写服务名，不写 npm 包名。
 
-### 2. Client 模块启动关系
+### 2. Client 包级信息边
 
-`package.json` 的 `dsh.client.inject` 写提供上述服务的 Client 模块包名，用于 boot graph 和启动顺序。它不是源码 import 清单，也不要求与 bundle 的 `require(...)` 一致。
+`package.json` 的 `dsh.client.inject` 写 Client 模块包名，但只作为 preflight display 和 HMR diff 使用的信息图。它不启用 Loader 行、不约束 Client apply 顺序，也不是源码 import 清单。
 
-### 3. ModuleLoader 值模块
+### 3. ModuleLoader 模块请求图
 
-Client bundle 中被 externalize 的值导入会留下 `require("...")`。这些模块必须由目标 Web 平台的 ModuleLoader 共享模块表提供：
+从 `0.1.0-rc.8` 起，`dsh.client.external` 声明非 baseline 值导入的精确模块 specifier。同步 `require` 不能等待，因此该图决定动态供应包的工厂先于消费者到达，并拒绝环。
+
+默认 baseline 对每个动态 Client bundle 隐式可用：
+
+```text
+react
+react/jsx-runtime
+react-dom
+react-dom/client
+@deepseek-ai/cordis
+@deepseek-ai/dsh-client-ui-slots
+@deepseek-ai/dsh-client-ui-primitives
+@deepseek-ai/dsh-client-runtime/client
+```
+
+不要把 baseline 重复写进 `dsh.client.external`。若值导入 `@owner/shared-client/client`，则在 rc.8+ 的 manifest 中声明：
+
+```json
+{
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "external": ["@owner/shared-client/client"]
+    }
+  }
+}
+```
+
+支持 rc.5/rc.7 时不能假设 `external` 协议存在，必须按目标版本的固定共享表和实际加载器行为构建另一条兼容路径。
+
+### 4. 构建产物的真实值请求
+
+Client bundle 中被 externalize 的值导入会留下 `require("...")`：
 
 ```bash
 rg -o 'require\("[^"]+"\)' lib/client.js | sort -u
 ```
 
-必须检查构建后的真实集合，不只检查 bundler 配置。`import type` 会被擦除，不会形成 `require(...)`，也不应因此增加 boot graph 边。
+必须检查构建后的真实集合，不只检查 bundler 配置。每一项都必须属于 baseline 或显式 `dsh.client.external`；其他模块应被打进插件 bundle。`import type` 会被擦除，不形成 `require(...)`，也不增加模块图边。
 
-### 4. npm 依赖字段
+### 5. npm 依赖字段
 
 | 依赖 | 推荐位置 | 原因 |
 | --- | --- | --- |
 | Client 编译使用的 React、Harness Client 包 | `devDependencies`；若目标官方包用 peer 表达兼容范围，可同时声明 peer | 本地类型检查和构建需要 |
-| Client external 值模块 | bundler external；仅在其提供模块参与启动关系时加入 `dsh.client.inject` | 运行时由 Web ModuleLoader 提供 |
+| Client baseline 值模块 | bundler external；不要重复写进 `dsh.client.external` | 运行时由 Web ModuleLoader 平台表提供 |
+| rc.8+ 非 baseline 值模块 | bundler external + 精确 `dsh.client.external`；动态 DSH 包通常同时为 peer + dev | 运行时由模块请求图提供并排序 |
 | 打进 Client bundle 的小型纯 JS 库 | `dependencies`，并由 bundler 打包 | 插件自行携带 |
 | Host 在 Node 运行时直接 `import` 的包 | `dependencies` 或确实由宿主提供时用 `peerDependencies` | Node 入口需要正常解析 |
 | 仅类型包、测试工具、构建工具 | `devDependencies` | 不参与运行 |
 
-GitHub profile 的组合根包可能没有直接声明插件 peer，因此 pnpm 会输出 `missing peer`。这不等于加载失败，也不能据此把所有 peer 机械移动到 `devDependencies`。先区分 Host 值导入、Client external 和纯类型依赖，再以目标版本官方包的声明方式、Host 启动结果和 Client load report 判断。
+GitHub profile 的组合根包可能没有直接声明插件 peer，因此 pnpm 会输出 `missing peer`。这不等于加载失败，也不能据此把所有 peer 机械移动到 `devDependencies`。先区分 Host 值导入、Client baseline、显式 `external` 和纯类型依赖，再以目标版本官方包的声明方式、Host 启动结果和 Client load report 判断。
 
 ## Cordis patch
 
@@ -214,7 +247,7 @@ bundle patches（按列表顺序）
   → argv --patch（按参数顺序）
 ```
 
-后层胜出。patch 命中已有行时会替换该行完整的 `config`，不会深合并键。例如只想覆盖 `port`，仍需重述该行要求的其他配置。组合包应提供合理默认值，同时保留用户 profile patch 的最终覆盖权。
+后层胜出。patch 命中已有行时会替换该行完整的 `config`，不会深合并键。例如只想覆盖 `port`，仍需重述该行要求的其他配置。组合包应提供合理默认值，同时保留用户 profile patch 的覆盖权。若由 Desktop 等产品启动器启动，还要检查它是否在官方四层之后追加产品层；这类后置层可以再次覆盖用户配置。
 
 安装或修改层后先检查：
 
@@ -254,7 +287,7 @@ export function apply(ctx: ClientContext): void {
 
 ## 双 bundle 构建
 
-Host 输出 Node ESM；Client 输出浏览器 CJS，并包裹为 ModuleLoader 模块。下面是基线 commit 上验证过的项目模板，不是永久 bundler API：
+Host 输出 Node ESM；Client 输出浏览器 CJS，并包裹为 ModuleLoader 模块。下面是 `0.1.1-rc.2` baseline 上验证过的独立仓库模板，不是永久 bundler API：
 
 ```ts
 import { defineConfig } from "tsdown";
@@ -264,9 +297,11 @@ const externals = [
   "react",
   "react/jsx-runtime",
   "react-dom",
+  "react-dom/client",
+  "@deepseek-ai/cordis",
   "@deepseek-ai/dsh-client-runtime/client",
-  "@deepseek-ai/dsh-client-locale/client",
   "@deepseek-ai/dsh-client-ui-slots",
+  "@deepseek-ai/dsh-client-ui-primitives",
 ];
 
 export default defineConfig([
@@ -302,8 +337,8 @@ export default defineConfig([
 
 1. Client 产物调用 `window.__ModuleLoader__.load`。
 2. ModuleLoader ID 与包名精确一致；不要只检查 bundle 中是否碰巧出现了包名字符串。
-3. 宿主模块 externalize，插件自带模块 bundle。
-4. 构建后的真实 `require(...)` 集合全部存在于目标 Web 共享模块表。
+3. baseline 与 manifest 显式请求的模块 externalize，插件私有模块 bundle。
+4. 构建后的真实 `require(...)` 集合都能归类为 baseline 或 `dsh.client.external`，模块图无环。
 
 ## CSS
 

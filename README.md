@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="./LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-4D6BFE?style=flat-square"></a>
-  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.5-4D6BFE?style=flat-square">
+  <img alt="DeepSeek Harness" src="https://img.shields.io/badge/DeepSeek%20Harness-0.1.1--rc.2-4D6BFE?style=flat-square">
 </p>
 
 # build-deepseek-harness-plugin
@@ -38,6 +38,12 @@ Not for in-session `cordis_define` packages, browser extensions, or PRs inside `
 
 ## Install the skill
 
+Ask your Agent to install `https://github.com/oil-oil/build-deepseek-harness-plugin`, or use the skills CLI:
+
+```sh
+npx skills add https://github.com/oil-oil/build-deepseek-harness-plugin
+```
+
 Claude Code / Codex:
 
 ```sh
@@ -48,7 +54,7 @@ ln -s "$(pwd)/build-deepseek-harness-plugin" ~/.codex/skills/build-deepseek-harn
 
 Then name `$build-deepseek-harness-plugin` on the next plugin task.
 
-## How an agent should start
+## Usage: how an agent should start
 
 1. Confirm the work is a packaged bundle, not a dynamic Cordis package.
 2. Read the official path that matches the task under [docs/user/develop](https://github.com/deepseek-ai/deepseek-harness/tree/master/docs/user/develop).
@@ -57,7 +63,8 @@ Then name `$build-deepseek-harness-plugin` on the next plugin task.
 | Task | Read |
 | --- | --- |
 | Evidence vs project convention | [references/official-practices.md](./references/official-practices.md) |
-| Package, patch, four-layer deps | [references/package-and-build.md](./references/package-and-build.md) |
+| Version breaks and launcher overlays | [references/version-and-integration-boundaries.md](./references/version-and-integration-boundaries.md) |
+| Package, patch, five-layer deps | [references/package-and-build.md](./references/package-and-build.md) |
 | Slots, theme, widgets | [references/client-slots-and-theme.md](./references/client-slots-and-theme.md) |
 | Settings, remotes, credentials, release | [references/persistence-and-release.md](./references/persistence-and-release.md) |
 
@@ -69,10 +76,15 @@ Check a plugin checkout:
 node scripts/check_plugin.mjs /path/to/plugin
 ```
 
-## Limits
+## Configuration
 
-- Slot names, Settings exposure, and Remote mounting are version observations. Re-check the target Harness commit.
+The skill needs no API key or service account. For version-sensitive work, give the agent the target Harness commit, CLI version, profile, and launcher or Desktop version/mode. The bundled reference checker accepts `--harness <checkout> --harness-ref <commit>`.
+
+## Compatibility and security boundaries
+
+- Maintainer baseline: DeepSeek Harness `0.1.1-rc.2`; this is not a blanket compatibility promise. Slot names, Settings exposure, Client module edges, and Remote mounting must be re-checked against the target commit.
 - Independent GitHub packages do not automatically appear on `ctx.remote` just because Host declared `@Remote`.
+- The skill reads plugin and Harness source, can run local build/check commands, and only edits or publishes repositories the user placed in scope. It does not require credentials or send project data to a service.
 - This is community field notes. If it disagrees with official docs, follow official docs.
 
 ## License

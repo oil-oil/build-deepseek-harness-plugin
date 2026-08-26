@@ -43,6 +43,7 @@ Catalog 通常会给出：
 | `settings.action` | 设置窗口顶部操作 | 只放短操作 |
 | `shell.overlay` | 壳层浮层：自定义检查器、停靠面板 | 不替换对话子树；关闭时清掉自己加的 inset |
 | `sidebar` | 整列侧栏 | single 替换会丢掉子槽位，除非你重声明 children |
+| `sidebar.brand.mark` / `sidebar.brand.name` | rc.8+ 侧栏品牌图形与名称 | 优先替换品牌座位，不要为换 logo 接管整列 |
 | `sidebar.footer.action` | 侧栏底部短操作 | 优先于替换整列 sidebar |
 | `details` | 官方工具行详情列 | 不要为自定义面板调用 `layout.openDetails` |
 
@@ -58,16 +59,16 @@ Catalog 通常会给出：
 
 ## 替换 single Slot 的所有权事务
 
-替换 `sidebar`、`details` 等 single Slot 时，父组件、子 Slot 和声明它们的 Client 模块必须一起核对。Host Cordis patch 与 Client boot graph 是两层装配关系；禁用 Host 侧官方行不能证明其 Client 模块已经消失。
+替换 `sidebar`、`details` 等 single Slot 时，父组件、子 Slot 和声明它们的 Client 模块必须一起核对。Host Cordis patch、最终 Loader 图和 Client boot graph 是不同装配面；插件 patch 禁用官方行后，Desktop 等产品层仍可能再次启用它。
 
 按以下顺序执行：
 
 1. 从目标版本 Catalog 和官方实现记录父 Slot owner、全部子 Slot、props、scope 和声明模块。
 2. 写下替换前必须保留的能力清单，例如工作区、设置、底部操作、折叠与切换。
 3. 在插件 bundle patch 中禁用被替换的官方 Cordis 行。
-4. 若插件重声明官方子 Slot，从 `dsh.client.inject` 中移除仍会声明这些 Slot 的官方 Client 模块；不要让两个模块同时拥有同名 Slot。
+4. 检查最终 Loader 图，确保仍会声明这些 Slot 的官方 Client 行确实 disabled 或不存在。不要通过增删 `dsh.client.inject` 推断启停，它只是信息边。
 5. 插件按目标版本的真实 spec 重声明并渲染全部必要子 Slot。新增 Slot 也要显式记录，避免 Harness 升级后被自定义外壳吞掉。
-6. 完整重启 Harness，检查 boot manifest、Client load report 和控制台，确认没有 `already declared`，每个 Slot 只有一个声明者。
+6. 完整重启 Harness，检查最终 boot manifest、Client load report 和控制台，确认没有 `already declared`，每个 Slot 只有一个声明者；桌面宿主还要核对版本与 presentation mode。
 7. 逐项验证替换前能力清单，并在卸载插件后确认官方 owner 自动恢复。
 
 不要只用源码字符串断言“调用了 `renderSlot`”作为完成证据。静态测试负责防止漏接，真实组合验收负责证明没有重复声明和能力回退。
@@ -243,11 +244,13 @@ ctx.effect(() => {
 
 ## Client 模块与 HMR
 
-Web 包通过以下三项进入 boot graph：
+Web 包通过以下条件进入 boot graph：
 
-1. `dsh.client.platform = "web"`。
-2. `exports["./client"]` 指向可读取的构建产物。
-3. 可选 `dsh.client.inject` 声明 Client 包级依赖边。
+1. 最终组合中存在指向该包的 enabled Loader 行。
+2. `dsh.client.platform = "web"`。
+3. `exports["./client"]` 指向可读取的构建产物。
+
+`dsh.client.inject` 只是信息图，不控制启停或 apply 顺序。rc.8+ 的 `dsh.client.external` 才表达非 baseline 同步模块请求，并约束供应工厂先于消费者到达。
 
 `window.__DSH_BOOT__` 中的 entry ID 等于包名，`rev` 来自 bundle 内容哈希。需要区分两类更新：
 

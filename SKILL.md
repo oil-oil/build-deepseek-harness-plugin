@@ -1,6 +1,6 @@
 ---
 name: build-deepseek-harness-plugin
-description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harness 可安装组合包。涉及 Cordis 装配、官方插件替换、Web Client bundle、Slot（含 sidebar / shell.overlay / settings.plugin.item）、Theme Token、本地化、Settings、Credentials、Typert Remote、改 schema 后界面不更新、GitHub 安装、依赖告警或加载失败时使用。不适用于普通网页脚本、浏览器扩展，也不适用于会话内 cordis_define 动态包。
+description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harness 可安装组合包。涉及 Cordis 装配、官方插件替换、Web Client bundle、Slot（含 sidebar / shell.overlay / settings.plugin.item）、Theme Token、本地化、Settings、Credentials、Typert Remote、改 schema 后界面不更新、GitHub 安装、依赖告警或加载失败时使用。普通 React 页面、浏览器扩展、Harness 核心仓库内开发和会话内 cordis_define 动态包不要触发本 Skill。
 ---
 
 # 构建 DeepSeek Harness 插件
@@ -33,15 +33,18 @@ description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harnes
 ## Reference 路由
 
 - 每次任务先读 [official-practices.md](references/official-practices.md)，记录证据基线。
+- 每次任务同时读 [version-and-integration-boundaries.md](references/version-and-integration-boundaries.md)，先确定版本分支、启动宿主和后置覆盖层。
 - 搭包、配置、构建或检查产物时读 [package-and-build.md](references/package-and-build.md)。
 - 做 Client Slot、主题、本地化或界面时读 [client-slots-and-theme.md](references/client-slots-and-theme.md)。
 - 做持久化、Remote、Settings、Credentials、安装或发布时读 [persistence-and-release.md](references/persistence-and-release.md)。
 
 只读与当前任务有关的 reference；不要为了“保险”一次加载全部细节。
 
+仓库根目录的 `README.md` 与 `README.zh.md` 是 GitHub 双语安装落地页，承担非 Agent 用户的安装、版本和限制说明，因此必须保留在根目录；执行规则仍以本文件和 `references/` 为准。
+
 ## 开始前
 
-1. 确认目标确实是 **DeepSeek Harness**，记录源码 commit、CLI/包版本、profile 和交付方式；版本与 commit 冲突时以 commit 为主锚点并保留两者。
+1. 确认目标确实是 **DeepSeek Harness**，记录源码 commit、CLI/包版本、profile、交付方式、启动宿主及其版本/模式；版本与 commit 冲突时以实际运行产物为主锚点并保留全部事实。
 2. 判断任务属于动态 Cordis Plugin，还是可安装的组合包；本 Skill 默认处理后者。
 3. 优先读取用户本地 Harness 源码和已安装包；本地不存在时再查官方仓库。
 4. 若已有相近的官方插件，比较其 `package.json`、`cordis.patch.yml`、Config、Host/Client 入口和构建配置。
@@ -53,7 +56,7 @@ description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harnes
 - 目标服务对应的 `src/client/index.ts` 和类型声明
 - `packages/host/apiproxy` 的 Web Settings namespace 暴露逻辑
 - 当前 profile 使用的 DeepSeek Harness 版本
-- 当前 Web 平台实际注册到 ModuleLoader 的共享模块表
+- 当前 Web 平台实际注册到 ModuleLoader 的 baseline、预加载模块和 `dsh.client.external` 供应图
 
 动态插件通过 `cordis_define` / `cordis_run` 交付纯 JavaScript Package，不能使用 import、JSX 或 TypeScript；可分发插件通过 `dsh.bundle` 安装到 profile。不要混用两套产物格式。会话内动态包改走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)。
 
@@ -90,20 +93,21 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 
 按 [package-and-build.md](references/package-and-build.md) 建立结构。Cordis patch 的 `name` 与安装包名一致，ModuleLoader ID 与包名精确一致；Cordis patch 的 `id` 只需在组合树中唯一，可以使用不带 scope 的短 ID。
 
-插件包声明 `dsh.bundle`，用户 profile 声明 `dsh.profile`；一个包不能同时承担两者。patch 覆盖已有行时会替换整段 `config`，不会深合并。安装后先执行 `dsh --profile <name> --dump-config` 核对最终组合。见官方[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。
+插件包声明 `dsh.bundle`，用户 profile 声明 `dsh.profile`；一个包不能同时承担两者。patch 覆盖已有行时会替换整段 `config`，不会深合并。安装后先执行 `dsh --profile <name> --dump-config` 核对 CLI 标准组合；若由 Desktop 等宿主启动，再核对宿主追加层后的最终组合。见官方[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。
 
-### 2. 分清四层依赖
+### 2. 分清五层依赖
 
-不要把下面四层当成同一份列表：
+不要把下面五层当成同一份列表：
 
 | 层 | 表示什么 | 示例 |
 | --- | --- | --- |
 | Client `export const inject` | Cordis 运行时服务名 | `slots`、`locale`、`connection` |
-| `dsh.client.inject` | 提供这些服务的 Client 模块及启动关系 | `@deepseek-ai/dsh-client-ui-slots` |
-| bundle 的 `require(...)` | externalize 后由 Web ModuleLoader 提供的值模块 | `react`、UI primitives |
+| `dsh.client.inject` | Client 包级信息边；供 preflight/HMR 使用 | `@deepseek-ai/dsh-client-ui-slots` |
+| `dsh.client.external` | rc.8+ 非 baseline 值模块的精确请求；约束代码到达顺序 | `@owner/shared-client/client` |
+| bundle 的 `require(...)` | externalize 后由 Web ModuleLoader 同步提供的值模块 | `react`、UI primitives |
 | npm 依赖字段 | 安装、运行兼容和本地编译关系 | dependencies、peer、devDependencies |
 
-只声明真正使用的服务和启动边。常见 Cordis 服务包括：
+只声明真正使用的服务和模块请求。`dsh.client.inject` 不启用 Loader 行，也不决定 Client apply 顺序；Cordis 服务等待决定激活，rc.8+ 的 `external` 模块图决定非 baseline 工厂先于消费者到达。常见 Cordis 服务包括：
 
 - `slots`：插入 UI。
 - `locale`：注册多语言文案。
@@ -111,7 +115,7 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 - `remote`：调用 Host 暴露的类型化接口。
 - `settingsScope`：仅在当前 Harness 确实向 Web 暴露该命名空间时使用。
 
-值导入才会形成 bundle `require(...)`；`import type` 编译后消失。实际 `require(...)` 必须存在于当前 Web 平台共享模块表中，但不要求与 `dsh.client.inject` 一一相等。不要复制另一个大型插件的整份依赖清单。详见 [package-and-build.md](references/package-and-build.md)。
+值导入才会形成 bundle `require(...)`；`import type` 编译后消失。实际 `require(...)` 必须属于当前 Web baseline、目标包精确声明的 `dsh.client.external`，或被打进插件 bundle。它不要求与 `dsh.client.inject` 一一相等。不要复制另一个大型插件的整份依赖清单。详见 [package-and-build.md](references/package-and-build.md)。
 
 硬依赖写入 `inject`；可选能力使用 `ctx.get()` 并处理缺失。通过 Cordis API 建立的监听、服务、工具和子插件已经属于 effect；只有外部连接、watcher、第三方订阅等 Cordis 不管理的资源才包进 `ctx.effect()`。异步 disposer 必须等待资源真正停稳；严格的清理顺序放进同一个 effect。见官方[插件与生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/framework/index.zh.md)。
 
@@ -148,7 +152,7 @@ ctx.slots.inject("settings.section", () =>
 
 必须先 `slots.inject()`，因为 Slot 可能在插件加载后才被宿主声明。不要复用官方条目的 ID，除非目标就是替换该条目。自定义检查器走官方 Catalog 里的 `shell.overlay`（list、可叠加、默认穿透点击）。不要调用 `layout.openDetails`：那会打开官方 `details` 列，该列由对话详情面板占用，不是插件检查器。替换整个 `sidebar` 时必须重声明它的子槽位，否则官方 Catalog 写明子座会随替换一起消失。详见 [client-slots-and-theme.md](references/client-slots-and-theme.md)。
 
-替换 `sidebar` 等 single Slot 是一次所有权迁移，不是只换一个 React 组件。先列出官方 owner、全部子 Slot 及声明它们的 Client 模块；再同时处理 Cordis patch 和 Client boot graph。禁用官方 Cordis 行不代表对应 Client 模块已经从 `dsh.client.inject` 消失。若插件要重声明 `sidebar.workspaces`、`sidebar.settings`、`sidebar.footer.action` 等子 Slot，必须移除仍会声明这些 Slot 的官方 Client 模块。完成后检查 boot manifest 和 Client load report，证明每个 Slot 只有一个声明者，并验证原工作区、设置和底部入口没有倒退。
+替换 `sidebar` 等 single Slot 是一次所有权迁移，不是只换一个 React 组件。先列出官方 owner、全部子 Slot 及声明它们的 Client 模块；再同时处理 Cordis patch 和最终 Loader/boot graph。必须在本插件 patch 中禁用声明旧 owner 的官方 Loader 行，并证明最终运行时没有被 Desktop 等后置产品层重新启用。不要通过增删 `dsh.client.inject` 推断模块启停，它只是信息元数据。完成后检查 boot manifest 和 Client load report，证明每个 Slot 只有一个声明者，并验证工作区、设置、品牌和底部入口没有倒退。
 
 Slot 是公开扩展位，不代表宿主内部 React 组件也已公开。只从包的公开 `exports` 导入运行时组件，不 deep import 源码或未导出的官方卡片。优先复用公开 primitives 和语义 Token；确实没有公开组件时，才实现最小的插件自有外壳，并使用根类名隔离 CSS。
 
@@ -180,7 +184,7 @@ ctx.effect(() => () => release(), "release theme overrides");
 - 跟随 Harness profile 或需要多端同步：先通过 Remote 可行性门禁；只有目标版本支持独立插件自包含生成并挂载通路时，才实现 Host Settings/Remote。
 - 使用 Harness `settingsScope`：必须先验证 `settings.describe` 能看到插件命名空间。
 
-当前基线 commit 的 Web Settings RPC 使用显式暴露集合，第三方 Host Settings namespace 不会因注册而自动暴露给浏览器。不要只因 Host 注册成功就判断 Client 可以绑定。具体证据和降级路径见 [persistence-and-release.md](references/persistence-and-release.md)。
+Settings 暴露必须按版本判断：rc.5 的 Web RPC 使用显式集合；rc.7 起会返回全部已注册 namespace 的脱敏描述。无论哪一版，都先用实际 `settings.describe` 证明 Client 可绑定；配置 API 仍受 loopback 信任边界约束。具体证据和降级路径见 [persistence-and-release.md](references/persistence-and-release.md)。
 
 普通设置遵循官方 [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md) 与 [Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)：
 
@@ -194,11 +198,11 @@ Credentials 与 Settings 是两个独立事务，不能伪造成原子保存。�
 
 ### 6. 正确构建浏览器 bundle
 
-Client bundle 需要包装为 Harness 的 ModuleLoader 模块，并把 Harness 已提供的浏览器模块 externalize。编译所需包放入 `devDependencies`；Host 的值导入根据宿主是否提供选择 `dependencies` 或 `peerDependencies`。`dsh.client.inject` 只描述 Client 模块启动关系，不能替代 npm 依赖或 bundler external 配置。
+Client bundle 需要包装为 Harness 的 ModuleLoader 模块，并把目标版本 baseline 模块 externalize。rc.8+ 的非 baseline 同步值导入还必须写入 `dsh.client.external`，模块图不能成环。编译所需包放入 `devDependencies`；Host 的值导入根据宿主是否提供选择 `dependencies` 或 `peerDependencies`。`dsh.client.inject` 只是信息边，不能替代 Cordis 服务注入、`external`、npm 依赖或 bundler 配置。
 
 不要为了消除编译问题，把所有宿主模块复制进 bundle。那会产生重复 React、Context 断裂、包体膨胀或运行时不兼容。
 
-构建后提取 `lib/client.js` 中真实的 `require(...)` 集合，并与目标版本 Web 共享模块表逐项核对。所有会影响结果的实时设置都要进入缓存 key；切换 provider、model、baseURL 或路由后不得复用旧结果。
+构建后提取 `lib/client.js` 中真实的 `require(...)` 集合，并逐项归类为 baseline、显式 `external` 或插件私有 bundle。所有会影响结果的实时设置都要进入缓存 key；切换 provider、model、baseURL 或路由后不得复用旧结果。
 
 ### 7. 验证
 
@@ -218,12 +222,12 @@ dsh --profile <name> --dump-config
 
 - `main` 和 Cordis patch 指向的文件存在。
 - `lib/client.js` 包含 `window.__ModuleLoader__.load(...)`。
-- Client 注入服务与实际使用一致。
+- Client Cordis 服务注入与实际使用一致；`dsh.client.inject` 只作信息核对。
 - 页面打开、关闭、插件卸载后没有残留样式或事件。
 - 刷新后状态符合约定。
 - 浅色、深色、窄窗口和长文案均正常。
 - 控制台和 Client load report 没有注入、Slot 或模块解析错误。
-- Client bundle 的 ModuleLoader ID 与包名一致，真实 `require(...)` 都由目标 Web 平台提供。
+- Client bundle 的 ModuleLoader ID 与包名一致；真实 `require(...)` 都属于 baseline 或 `dsh.client.external`，其供应图无环。
 
 涉及人可见 UI 时，把视觉验收当作完成条件：至少覆盖空态、加载态、错误态、选中态，以及此次修改直接影响的切换、按钮和官方入口；替换整列 UI 时再覆盖其原有能力清单。没有用户授权浏览器自动化时，先完成静态、构建和运行时检查，再请用户人工确认或明确标注“代码已验证，视觉尚未确认”。没有真实页面证据时，不宣称 UI 已完全修复。
 
@@ -235,11 +239,11 @@ dsh --profile <name> --dump-config
 
 1. lockfile 锁定到预期 GitHub commit。
 2. 重启 Harness，并轮询端口与 HTTP，避免用一次请求误判启动失败。
-3. 检查 `window.__DSH_BOOT__` 或等价 boot manifest 中存在插件、revision 和 inject 边。
+3. 检查 `window.__DSH_BOOT__` 或等价 boot manifest 中存在插件、revision、信息 `inject` 边和 rc.8+ 的 `external` 模块边。
 4. 直接请求插件 `client.js`，确认服务端提供的是新产物。
 5. 刷新浏览器页面，再检查 UI 和 Client load report。服务端模块图通常需要重启，浏览器 boot manifest 通常需要刷新。
 
-pnpm peer warning 只表示 profile 组合中的依赖声明不完整，不等于运行失败。最终以 Host 启动、boot manifest、bundle `require(...)` 和 Client load report 为准。
+pnpm peer warning 只表示 profile 组合中的依赖声明不完整，不等于运行失败。最终以 Host 启动、最终 Loader 图、boot manifest、bundle `require(...)` 和 Client load report 为准。
 
 ### 8. 发布与安装
 
@@ -284,7 +288,7 @@ npx @deepseek-ai/dsh plugin --profile <name> add github:owner/repository
 ```bash
 python3 "$SKILL_CREATOR/scripts/quick_validate.py" "$SKILL_DIR"
 node --test "$SKILL_DIR/scripts/"*.test.mjs
-node "$SKILL_DIR/scripts/check_references.mjs" "$SKILL_DIR" --harness /path/to/deepseek-harness
+node "$SKILL_DIR/scripts/check_references.mjs" "$SKILL_DIR" --harness /path/to/deepseek-harness --harness-ref <commit>
 ```
 
 `$SKILL_DIR` 为本目录。有 Codex skill-creator 时，`$SKILL_CREATOR` 指向它的 `scripts` 上一级。

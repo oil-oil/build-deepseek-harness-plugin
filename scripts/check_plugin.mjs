@@ -185,7 +185,7 @@ if (client) {
   }
 
   if (!Array.isArray(client.inject) || client.inject.length === 0) {
-    addWarning("dsh.client.inject 为空；请确认 Client 不依赖任何 Harness 浏览器服务。");
+    addNote("dsh.client.inject 为空；它只是包级信息图，不代表 Cordis 服务缺失。");
   } else {
     const invalidInject = client.inject.filter((item) => typeof item !== "string" || item.length === 0);
     const duplicateInject = client.inject.filter((item, index) => client.inject.indexOf(item) !== index);
@@ -203,7 +203,40 @@ if (client) {
       );
     }
     if (invalidInject.length === 0 && mistakenServices.length === 0) {
-      addPassed(`声明了 ${client.inject.length} 个 Client 模块注入`);
+      addPassed(`声明了 ${client.inject.length} 条 Client 包级信息边`);
+    }
+  }
+
+  const baselineExternals = new Set([
+    "react",
+    "react/jsx-runtime",
+    "react-dom",
+    "react-dom/client",
+    "@deepseek-ai/cordis",
+    "@deepseek-ai/dsh-client-ui-slots",
+    "@deepseek-ai/dsh-client-ui-primitives",
+    "@deepseek-ai/dsh-client-runtime/client",
+  ]);
+  let declaredExternals = [];
+  if (client.external !== undefined) {
+    if (!Array.isArray(client.external)) {
+      addError("dsh.client.external 必须是字符串数组（该字段从 Harness 0.1.0-rc.8 起可用）。");
+    } else {
+      declaredExternals = client.external.filter((item) => typeof item === "string" && item.length > 0);
+      if (declaredExternals.length !== client.external.length) {
+        addError("dsh.client.external 只能包含非空模块 specifier。");
+      }
+      const duplicateExternal = declaredExternals.filter((item, index) => declaredExternals.indexOf(item) !== index);
+      if (duplicateExternal.length > 0) {
+        addError(`dsh.client.external 含重复项：${[...new Set(duplicateExternal)].join(", ")}`);
+      }
+      const redundantBaseline = declaredExternals.filter((item) => baselineExternals.has(item));
+      if (redundantBaseline.length > 0) {
+        addWarning(`dsh.client.external 重复声明了 rc.8+ baseline：${redundantBaseline.join(", ")}`);
+      }
+      if (declaredExternals.length > 0) {
+        addPassed(`声明了 ${declaredExternals.length} 个非 baseline 模块请求`);
+      }
     }
   }
 
@@ -258,6 +291,19 @@ if (client) {
         addWarning(`Client external 模块未出现在任何依赖字段：${specifier}`);
       }
     }
+    for (const specifier of uniqueRequires) {
+      if (isNodeBuiltin(specifier) || specifier.startsWith(".") || specifier.startsWith("/")) continue;
+      if (baselineExternals.has(specifier) || declaredExternals.includes(specifier)) continue;
+      addWarning(
+        `Client bundle 留下非 baseline require(${JSON.stringify(specifier)})，但 dsh.client.external 未声明；` +
+        "Harness 0.1.0-rc.8+ 的同步模块图可能无法先注册其供应工厂。",
+      );
+    }
+    for (const specifier of declaredExternals) {
+      if (!uniqueRequires.includes(specifier)) {
+        addWarning(`dsh.client.external 声明了未出现在构建产物 require(...) 中的模块：${specifier}`);
+      }
+    }
     checkTracked(clientPath, "Client 产物");
     checkPackaged(clientPath, "Client 产物");
   }
@@ -284,18 +330,27 @@ const clientInject = Array.isArray(client?.inject) ? client.inject : [];
 const officialSidebarClient = "@deepseek-ai/dsh-client-ui-sidebar";
 const officialSidebarInjected = clientInject.includes(officialSidebarClient);
 const officialSidebarDisabled = /^\s*-\s+id\s*:\s*["']?ui-sidebar["']?\s*$\n(?:^[ \t]+.*\n)*?^[ \t]+disabled\s*:\s*true\s*$/m.test(patchText);
-const declaresSidebarChildren = /["']sidebar\.(?:workspaces|settings|footer\.action)["']\s*:\s*\{\s*kind\s*:/.test(combinedSource);
+const declaresSidebarChildren = /["']sidebar\.[a-zA-Z0-9_.-]+["']\s*:\s*\{\s*kind\s*:/.test(combinedSource);
 const replacesSidebar = /\bname\s*:\s*["']sidebar["']/.test(combinedSource);
 
-if (officialSidebarInjected && officialSidebarDisabled) {
+if (declaresSidebarChildren && !officialSidebarDisabled) {
   addError(
-    `Cordis patch 已禁用 ui-sidebar，但 dsh.client.inject 仍包含 ${officialSidebarClient}；` +
-    "Host patch 与 Client boot graph 是两层，官方 Client 模块仍可能声明 sidebar 子 Slot 并造成冲突。",
+    "源码重声明了 sidebar 子 Slot，但本 bundle patch 未禁用 ui-sidebar Loader 行；" +
+    "替换语义必须由插件自包含，并在最终运行时证明官方声明者未被产品后置层重新启用。",
   );
-} else if (officialSidebarInjected && declaresSidebarChildren) {
-  addError(
-    `源码重声明了 sidebar 子 Slot，但 dsh.client.inject 仍包含 ${officialSidebarClient}；` +
-    "请保证每个 Slot 只有一个声明者。",
+}
+
+if (officialSidebarInjected && (officialSidebarDisabled || declaresSidebarChildren)) {
+  addNote(
+    `${officialSidebarClient} 仍出现在 dsh.client.inject；该字段只是信息边，不会启用或禁用 Loader 行。` +
+    "请核对最终 Loader 图与 boot manifest，而不是据此判断 Slot 所有权。",
+  );
+}
+
+if (officialSidebarDisabled && (replacesSidebar || declaresSidebarChildren)) {
+  addNote(
+    "插件在 bundle patch 中接管 sidebar；该检查只证明包内层。" +
+    "DSH Desktop 等宿主可能在 profile/home 之后追加 Loader 覆盖，必须检查最终 generation 和 boot manifest。",
   );
 }
 
@@ -318,7 +373,8 @@ if (hasConfigType && !hasConfigSchema) {
 
 if (/settingsScope\s*\.\s*bind\b/.test(combinedSource)) {
   addNote(
-    "源码使用 settingsScope.bind（含泛型写法）。必须通过目标运行时 settings.describe 验证 namespace 已向 Web 暴露。",
+    "源码使用 settingsScope.bind（含泛型写法）。必须通过目标运行时 settings.describe 验证 namespace：" +
+    "rc.5 仅暴露显式集合，rc.7+ 暴露全部已注册 namespace；配置 API 仍仅限 loopback。",
   );
 }
 

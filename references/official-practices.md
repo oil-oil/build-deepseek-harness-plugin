@@ -1,6 +1,6 @@
 # 官方规范与核对入口
 
-本页用于区分“官方稳定契约”“当前版本源码事实”和“项目实战约定”。最后核对基线：DeepSeek Harness commit `47f943859bef60e4160492346772ded9b24f765a`（commit 日期 2026-08-13，核对日期 2026-08-14）；该提交的根包与 `@deepseek-ai/dsh` CLI 都标记为 `0.1.0-rc.5`。Harness 仍处于 Developer Preview，每个任务都要重新记录目标 commit、实际安装版本和 profile，不能只写一个版本号。
+本页用于区分“官方稳定契约”“当前版本源码事实”和“项目实战约定”。最后核对基线：DeepSeek Harness commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`（核对日期 2026-08-26），`@deepseek-ai/dsh` 为 `0.1.1-rc.2`。具体版本分界见 [version-and-integration-boundaries.md](version-and-integration-boundaries.md)。Harness 仍处于 Developer Preview，每个任务都要重新记录目标 commit、实际安装版本、profile 和启动宿主，不能只写一个版本号。
 
 ## 目录
 
@@ -50,7 +50,7 @@
 - [测试策略](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/testing.zh.md)
 - [防御性模式](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/defensive-patterns.zh.md)
 
-这些 `master` 链接用于找到官方入口，不是版本证据。本地有官方仓库时，优先读同一提交下的文件和生成 Catalog；需要记录某项版本观察时，使用 commit 固定链接，例如[基线 Slot Catalog](https://github.com/deepseek-ai/deepseek-harness/blob/47f943859bef60e4160492346772ded9b24f765a/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)。
+这些 `master` 链接用于找到官方入口，不是版本证据。本地有官方仓库时，优先读同一提交下的文件和生成 Catalog；需要记录某项版本观察时，使用 commit 固定链接，例如[基线 Slot Catalog](https://github.com/deepseek-ai/deepseek-harness/blob/b150a551b8d465e31e418e1b2eaf5e79bbb7d28e/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)。
 
 ## 实践与证据映射
 
@@ -148,16 +148,17 @@ export const Config: Schema<Config> = Schema.object({
 - 组合包声明 `dsh.bundle.patch`，回答“贡献什么”。
 - profile 声明有序的 `dsh.profile.bundles`，回答“启动哪些组合包”。
 - 一个包不能同时是 bundle 和 profile。
-- 生效顺序是：各 bundle patch → profile patch → home patch → argv `--patch`；后层胜出。
+- 官方 CLI 的生效顺序是：各 bundle patch → profile patch → home patch → argv `--patch`；后层胜出。Desktop 等产品启动器还可能追加自己的最终层，必须单独验证。
 - patch 命中已有行时会替换该行的完整 `config`，不会深合并。覆盖方必须重述所有必需字段。
 - 插件默认值应允许用户在 profile patch 中继续覆盖。
-- 启动前先运行 `dsh --profile <name> --dump-config`，确认层顺序、行 ID 和完整配置。
+- 启动前先运行 `dsh --profile <name> --dump-config`，确认 CLI 标准层顺序、行 ID 和完整配置；若由 Desktop 启动，再检查 Desktop 最终 generation，不能把 CLI 输出当成最终产品组合。
 
 ## Web Client 与样式
 
 官方依据：[Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)、[Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)、[Theme 服务](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-theme/README.zh.md)、[Web UI 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.zh.md)。
 
-- 包通过 `dsh.client.platform = "web"`、`exports["./client"]` 和可选 `dsh.client.inject` 进入 `window.__DSH_BOOT__`。
+- 启用的 Loader 行所指包通过 `dsh.client.platform = "web"` 与 `exports["./client"]` 进入 `window.__DSH_BOOT__`；`dsh.client.inject` 只是信息边，不负责启用或排序。
+- rc.8+ 用 `dsh.client.external` 声明非 baseline 同步模块请求；该图约束代码到达顺序且拒绝环，与 Cordis 服务 `inject` 无关。
 - entry `id` 等于包名；bundle 的内容哈希形成 `rev`。插件集合变化通常需要重启，bundle 内容变化才走 HMR rebuild。
 - Feature UI 使用 CSS Modules、语义 `--dsw-alias-*` Token 和已有 typography；不要复制静态色值、在组件 CSS 中写 light/dark 分支或增加另一套全局主题。
 - 字号与行高成对设置；保留键盘焦点和 reduced-motion 行为。
@@ -195,9 +196,9 @@ export const Config: Schema<Config> = Schema.object({
 - 目标 commit、包版本和 profile 名称。
 - Config、Service、Event、Slot、Theme Token 的实际类型和 Catalog。
 - `defineTool`、`ctx.jobs` 与工具 schema 是否仍按官方教程进入系统提示。
-- Web ModuleLoader 共享模块表与 Client bundle 的真实 `require(...)`。
-- Settings namespace 是否向 Web 暴露，Credentials 的 describe/set/resolve 契约。
+- Web ModuleLoader baseline、`dsh.client.external` 供应图与 Client bundle 的真实 `require(...)`。
+- Settings namespace 是否向 Web 暴露；rc.5 与 rc.7+ 必须分支判断。核对 Credentials 的 describe/set/unset/resolve 和 record/authorization 契约。
 - 独立安装包的 `/remote` contribution 是否会被 Client 组合发现并挂载。
 - Settings、Credentials、目录选择和本地文件能力的 loopback/trust 边界。
 - Git 安装策略、pnpm 版本和 `allowBuilds` 行为。
-- HMR、boot manifest、重启与刷新边界。
+- HMR、boot manifest、Host 重启、页面刷新与产品启动器后置 patch 边界。

@@ -182,7 +182,7 @@ test("拒绝 Client 产物未被 files 覆盖", () => {
   }
 });
 
-test("拒绝禁用官方 sidebar 后仍注入其 Client 模块", () => {
+test("不把 dsh.client.inject 误判成 sidebar Loader 启停开关", () => {
   const root = fixture();
   try {
     updatePackage(root, (pkg) => {
@@ -193,14 +193,14 @@ test("拒绝禁用官方 sidebar 后仍注入其 Client 模块", () => {
       "- id: ui-sidebar\n  disabled: true\n- insert:\n    - id: example-plugin\n      name: \"@example/plugin\"\n",
     );
     const result = run(root);
-    assert.equal(result.status, 1, result.stdout + result.stderr);
-    assert.match(result.stdout, /Host patch 与 Client boot graph 是两层/);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /该字段只是信息边，不会启用或禁用 Loader 行/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("拒绝通过 sidebar children 重声明子 Slot 时保留官方声明模块", () => {
+test("拒绝重声明 sidebar children 却未在 bundle patch 禁用官方 Loader 行", () => {
   const root = fixture();
   try {
     updatePackage(root, (pkg) => {
@@ -212,7 +212,7 @@ test("拒绝通过 sidebar children 重声明子 Slot 时保留官方声明模�
     );
     const result = run(root);
     assert.equal(result.status, 1, result.stdout + result.stderr);
-    assert.match(result.stdout, /请保证每个 Slot 只有一个声明者/);
+    assert.match(result.stdout, /本 bundle patch 未禁用 ui-sidebar Loader 行/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -232,6 +232,7 @@ test("提示 sidebar 替换可能漏掉官方子 Slot", () => {
     const result = run(root);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /未识别到 sidebar 子 Slot 重声明/);
+    assert.match(result.stdout, /该检查只证明包内层/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -247,6 +248,52 @@ test("提示依赖 Harness 内部对话 DOM", () => {
     const result = run(root);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /应集中到一个可释放适配器/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("拒绝非数组的 dsh.client.external", () => {
+  const root = fixture();
+  try {
+    updatePackage(root, (pkg) => {
+      pkg.dsh.client.external = "@example/shared/client";
+    });
+    const result = run(root);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /dsh\.client\.external 必须是字符串数组/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("提示 rc.8+ 非 baseline require 缺少 external 声明", () => {
+  const root = fixture({ clientBody: 'require("@example/shared/client");' });
+  try {
+    updatePackage(root, (pkg) => {
+      pkg.peerDependencies["@example/shared"] = "1.0.0";
+      pkg.devDependencies["@example/shared"] = "1.0.0";
+    });
+    const result = run(root);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /dsh\.client\.external 未声明/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("接受与构建产物一致的 rc.8+ external 请求", () => {
+  const root = fixture({ clientBody: 'require("@example/shared/client");' });
+  try {
+    updatePackage(root, (pkg) => {
+      pkg.dsh.client.external = ["@example/shared/client"];
+      pkg.peerDependencies["@example/shared"] = "1.0.0";
+      pkg.devDependencies["@example/shared"] = "1.0.0";
+    });
+    const result = run(root);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.doesNotMatch(result.stdout, /dsh\.client\.external 未声明/);
+    assert.match(result.stdout, /声明了 1 个非 baseline 模块请求/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

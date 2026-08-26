@@ -19,22 +19,21 @@
 
 | 需求 | 方案 | 优点 | 限制 |
 | --- | --- | --- | --- |
-| 当前浏览器保存 UI 偏好 | 版本化 `localStorage` | 独立、简单、无需 Host 白名单 | 不跨浏览器、不跨 origin |
-| 跟随 Harness profile | 插件 Host Settings + 已验证可挂载的 Remote | 可集中存储、可校验 | 当前基线的独立安装包缺少自动 Remote 挂载能力 |
-| 使用 Harness 原生 SettingsScope | 先确认命名空间已暴露 | 与官方设置一致 | 某些版本过滤第三方 namespace |
+| 当前浏览器保存 UI 偏好 | 版本化 `localStorage` | 独立、简单 | 不跨浏览器、不跨 origin |
+| 跟随 Harness profile 的普通配置 | Host 注册 Settings + Client `settingsScope` | 可集中存储、可校验 | rc.5 过滤第三方 namespace；配置 API 仅 loopback |
+| Settings 不能表达的 Host 能力 | 已验证可挂载的 Remote | 类型化、自定义方法 | 独立安装包没有自动 Remote 聚合 |
 
 ## 已验证的版本限制
 
-在基线 commit `47f943859bef60e4160492346772ded9b24f765a`（仓库包版本 `0.1.0-rc.5`）中：
+版本必须分支判断：
 
-- Host 侧可以注册第三方 Settings namespace。
-- Web Settings RPC 只返回显式暴露集合：固定的 `WEB_SETTINGS_NAMESPACES`，加上当前版本明确纳入的可配置 provider namespace；普通第三方注册不会自动加入。
-- 因此 Client 调用 `ctx.settingsScope.bind({ namespace: "third.party" })` 并不代表浏览器一定能读写该 namespace。
-- [Client Remote 聚合](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/remotes/src/client/index.ts)在 Harness 构建期静态选择并挂载固定的 `/remote` contributions；独立安装包只在 Host 声明 `@Remote`，不会让 `ctx.remote.<namespace>` 自动出现。
+- `0.1.0-rc.5` / commit `47f943859bef60e4160492346772ded9b24f765a`：Web Settings RPC 只返回显式集合，普通第三方 namespace 不会因 Host 注册而自动加入。
+- `0.1.0-rc.7` / commit `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca` 起：Web `settings.describe` 返回全部已注册 namespace 的脱敏描述，写入也不再检查产品白名单。
+- 当前维护基线 `0.1.1-rc.2` / commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` 延续 rc.7 行为。
+- [Client Remote 聚合](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/remotes/src/client/index.ts)仍在 Harness 构建期静态选择并挂载固定的 `/remote` contributions；独立安装包只在 Host 声明 `@Remote`，不会让 `ctx.remote.<namespace>` 自动出现。
 - Settings/Credentials 配置面仅允许 loopback；非 loopback 浏览器的 [SettingsScope](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings/src/client/settings-scope.ts)会降级为进程内 memory，而不是跨机器同步。
-- 重新加载后设置消失，常见原因就是 Client 从未真正拿到可持久化 namespace。
 
-版本升级后必须重新查看 [`packages/host/apiproxy/README.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)、`packages/host/apiproxy/src/api-proxy.ts` 和 `settings.describe` 的实际返回。不要把该基线的限制永久写死，也不要要求普通用户修改白名单。
+版本升级后必须重新查看 [`packages/host/apiproxy/README.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)、`packages/host/apiproxy/src/api-proxy.ts` 和 `settings.describe` 的实际返回。不要把 rc.5 的白名单限制写成永久结论，也不要为 rc.7+ 要求用户修改不存在的白名单。
 
 ## 浏览器本地持久化
 
@@ -75,7 +74,7 @@ export function saveSettings(storage: Storage, value: Settings): boolean {
 
 ## profile 级持久化
 
-若需要跨浏览器窗口、与 CLI 共用或存储敏感信息，理论上使用 Mixed 插件；但必须先通过下方 Remote 可行性门禁。当前基线的独立 GitHub 安装包不能只靠自有 `@Remote` 自动打通 Client→Host：
+若需要跨浏览器窗口、与 CLI 共用普通配置，rc.7+ 优先注册插件自己的 Settings namespace，再由 Client `settingsScope` 绑定；先用实际 `settings.describe` 证明可见。只有 Settings 不能表达自定义 Host 操作时才进入下方 Remote 可行性门禁。独立 GitHub 安装包不能只靠自有 `@Remote` 自动打通 Client→Host：
 
 1. Host 注册插件自己的 Settings schema 或存储服务。
 2. Host 暴露最小的类型化 Remote，例如 `getThemeSettings`、`setThemeSettings`。
@@ -89,7 +88,7 @@ Host 注册服务不等于 Client 自动获得 `ctx.remote.<namespace>`。开始
 
 1. Host 方法是否通过目标版本公开的 `@Remote` / `@RemoteScope` 约定声明。
 2. 构建是否生成并交付 Host 描述符和 `/remote` Client contribution。
-3. Client 组合是否显式挂载该 contribution，并把对应服务加入真实启动边。
+3. Client 组合是否显式挂载该 contribution，并通过 Cordis 服务 `inject` 等待真实服务；不要用 `dsh.client.inject` 代替。
 4. 请求与结果是否为可校验、无损 JSON；不要跨 wire 传 Context、Service、React Element 或类实例。
 5. 独立仓库能否自包含完成生成和构建；若依赖 Harness monorepo 私有构建步骤，就不能宣称可独立安装。
 
@@ -97,7 +96,7 @@ Host 注册服务不等于 Client 自动获得 `ctx.remote.<namespace>`。开始
 
 独立仓库也可以手写 invocation descriptor（zod codec + `TypertRemoteService`），再导出 `./typert` 并在 Client 里 `ctx.remote.$mount(...)`。这是已验证的项目约定，不是官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 生成流水线的替代文档。Host 与 Client 必须同一套方法与 schema。改契约后要重建两端、**重启** `dsh` 进程，再硬刷新浏览器。官方 Gateway 只处理一元请求和一元结果，没有推送；磁盘或任务要近实时，就由 Host 失效缓存并增加 `revision`，Client 轮询廉价状态。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段，官方文档没有单独写这条。
 
-本地开发可以把 `lib/` hardlink 或 `file:` 链到 `$DSH_HOME/profiles/<name>/node_modules/<pkg>`，这样 `pnpm build` 会更新运行树。只改已有方法内部实现通常不必重启；改 schema / 方法名 / `dsh.client.inject` / patch 行必须重启。`file:` 依赖是打包硬链接：tsdown 原地写 JS 会一起更新，但 `cp` 附属脚本会 unlink 后新建，profile 里那份变成孤儿旧文件。附属脚本必须原地覆写。detached 预览服务、Ego 空间这类进程不能只记内存 Map；Harness 重启后 Map 丢了、进程还在，要有磁盘登记并在启动时按 pid/命令行回收。
+本地开发可以把 `lib/` hardlink 或 `file:` 链到 `$DSH_HOME/profiles/<name>/node_modules/<pkg>`，这样 `pnpm build` 会更新运行树。只改已有方法内部实现通常不必重启；改 schema、方法名、`dsh.client` metadata、Remote descriptor 或 patch 行必须重启。`file:` 依赖是打包硬链接：tsdown 原地写 JS 会一起更新，但 `cp` 附属脚本会 unlink 后新建，profile 里那份变成孤儿旧文件。附属脚本必须原地覆写。detached 预览服务、Ego 空间这类进程不能只记内存 Map；Harness 重启后 Map 丢了、进程还在，要有磁盘登记并在启动时按 pid/命令行回收。
 
 ## Settings 安全更新
 
@@ -110,11 +109,13 @@ Client 能从连接层 `settings.describe` 看到目标 namespace 后，仍要�
 5. 成功后以服务端返回的 value/revision 重建基线。
 6. 遇到 `settings-conflict` 时保留草稿并提示用户处理外部变化，不盲目重试。
 
-路径级 mutate 能保留未知字段、其他官方 UI 管理的字段和未来版本新增字段。插件只有在确实替换并维护某个官方插件完整 schema 时，才可复用其已暴露 namespace；独立插件不得为了绕过 Web 白名单占用官方 namespace。
+路径级 mutate 能保留未知字段、其他官方 UI 管理的字段和未来版本新增字段。插件使用自己的 namespace；只有确实替换并维护某个官方插件完整 schema 时，才可复用官方 namespace。rc.5 若无法暴露独立 namespace，应降级或声明不兼容，不能占用官方 namespace 绕过限制。
 
 ## Credentials 安全边界
 
 API Key、Token 和密码使用 Harness Credentials，不放入普通 Settings。官方[凭据](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)与[配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)的约定：
+
+`0.1.1-rc.2` 的 Credentials 已有两个键空间：环境变量式 `CredentialRef` 继续服务 API Key 的 resolve/describe/set/unset；`CredentialKey` records 与 authorization flow 服务插件持有的授权记录。两套地址、读写和事件不能混用。只需要一个 provider API Key 时继续用 ref，不要为了“更新”迁移成 record。
 
 ```text
 Client API credentials.describe(refs)
@@ -244,12 +245,12 @@ Done in ...
 
 ### 常见 peer 告警
 
-Client 插件把 React 或 Harness Client 包放进 `peerDependencies`，而 profile 根包没有直接声明它们时，pnpm 可能提示 missing peer。按四层依赖分别判断：
+Client 插件把 React 或 Harness Client 包放进 `peerDependencies`，而 profile 根包没有直接声明它们时，pnpm 可能提示 missing peer。按五层依赖分别判断：
 
 1. 编译和类型检查需要的包放在 `devDependencies`。
 2. Host 值导入若由 Harness 提供，可按目标官方包惯例声明 peer；否则放 `dependencies`。
-3. Client 服务提供模块按实际启动关系放在 `dsh.client.inject`。
-4. Client 值模块由 bundler externalize，并确认存在于 Web ModuleLoader 共享模块表。
+3. Cordis 服务依赖写 Client `export const inject`；`dsh.client.inject` 只保留真实包级信息边。
+4. Client 值模块由 bundler externalize；baseline 隐式提供，rc.8+ 非 baseline 请求写入 `dsh.client.external`。
 
 不要为了消除告警机械删除所有 peer，也不要让用户在 Harness profile 根目录手动安装一长串内部包；两者都可能造成运行时缺包或版本漂移。以 boot manifest、真实 bundle `require(...)` 和 Client load report 判断。
 
