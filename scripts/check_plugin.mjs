@@ -5,11 +5,50 @@ import { builtinModules } from "node:module";
 import { resolve, relative, extname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const root = resolve(process.argv[2] ?? process.cwd());
+const args = process.argv.slice(2);
+let root = process.cwd();
+let harnessVersion = "0.1.2-rc.1";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index];
+  if (arg === "--harness-version") {
+    const value = args[++index];
+    if (!value || value.startsWith("--")) {
+      console.error("错误：--harness-version 需要完整版本号。");
+      process.exit(2);
+    }
+    harnessVersion = value;
+  } else if (arg.startsWith("--")) {
+    console.error(`错误：未知参数 ${arg}`);
+    process.exit(2);
+  } else {
+    root = resolve(arg);
+  }
+}
+// 只录入已核对的 platform.ts，不把某个 rc/alpha 的模块表外推到其他版本。
+const baselines = {
+  "0.1.1-rc.2": {
+    commit: "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
+    modules: ["@deepseek-ai/dsh-client-runtime/client"],
+  },
+  "0.1.2-rc.1": {
+    commit: "a66e4702047846cdaa10c66c9d3df3951f5ea70d",
+    modules: ["@deepseek-ai/dsh-client-store"],
+  },
+  "0.1.5-alpha.1": {
+    commit: "5dda764ed3aa172535a7967b06ff95d9cbfe536a",
+    modules: ["@deepseek-ai/dsh-client-store", "@deepseek-ai/dsh-client-ui-dockkit"],
+  },
+};
+const baseline = Object.hasOwn(baselines, harnessVersion) ? baselines[harnessVersion] : undefined;
+if (!baseline) {
+  console.error(`错误：尚未核对 Harness ${harnessVersion} 的模块表；请先核对目标 platform.ts 并更新版本基线。`);
+  process.exit(2);
+}
 const errors = [];
 const warnings = [];
 const notes = [];
 const passed = [];
+passed.push(`模块表基线：Harness ${harnessVersion} @ ${baseline.commit}（不是已安装版本的自动探测）`);
 
 function addError(message) {
   errors.push(message);
@@ -215,7 +254,7 @@ if (client) {
     "@deepseek-ai/cordis",
     "@deepseek-ai/dsh-client-ui-slots",
     "@deepseek-ai/dsh-client-ui-primitives",
-    "@deepseek-ai/dsh-client-runtime/client",
+    ...baseline.modules,
   ]);
   let declaredExternals = [];
   if (client.external !== undefined) {
@@ -232,7 +271,7 @@ if (client) {
       }
       const redundantBaseline = declaredExternals.filter((item) => baselineExternals.has(item));
       if (redundantBaseline.length > 0) {
-        addWarning(`dsh.client.external 重复声明了 rc.8+ baseline：${redundantBaseline.join(", ")}`);
+        addWarning(`dsh.client.external 重复声明了 ${harnessVersion} baseline：${redundantBaseline.join(", ")}`);
       }
       if (declaredExternals.length > 0) {
         addPassed(`声明了 ${declaredExternals.length} 个非 baseline 模块请求`);
@@ -293,8 +332,12 @@ if (client) {
     }
     for (const specifier of uniqueRequires) {
       if (isNodeBuiltin(specifier) || specifier.startsWith(".") || specifier.startsWith("/")) continue;
+      if (specifier === "@deepseek-ai/dsh-client-runtime/client" && !baselineExternals.has(specifier)) {
+        addError(`Harness ${harnessVersion} 已移除 ${specifier}；defineStore 改从 @deepseek-ai/dsh-client-store 导入，Context 类型改从 @deepseek-ai/cordis 导入。不能靠 inject 或 external 恢复已移除模块。`);
+        continue;
+      }
       if (baselineExternals.has(specifier) || declaredExternals.includes(specifier)) continue;
-      addWarning(
+      addError(
         `Client bundle 留下非 baseline require(${JSON.stringify(specifier)})，但 dsh.client.external 未声明；` +
         "Harness 0.1.0-rc.8+ 的同步模块图可能无法先注册其供应工厂。",
       );

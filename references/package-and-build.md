@@ -68,7 +68,7 @@ profile 用 `file:` / 硬链接装本地包时，不要用 `cp` 覆盖 `lib/` �
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots"
       ]
@@ -81,7 +81,9 @@ profile 用 `file:` / 硬链接装本地包时，不要用 `cp` 覆盖 `lib/` �
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-locale": "<目标版本>",
-    "@deepseek-ai/dsh-client-runtime": "<目标版本>",
+    "@deepseek-ai/dsh-client-ui-renderer": "<目标版本>",
+    "@deepseek-ai/dsh-client-store": "<目标版本>",
+    "@deepseek-ai/cordis": "<目标 Cordis 版本>",
     "@deepseek-ai/dsh-client-ui-slots": "<目标版本>",
     "@types/react": "^18.3.0",
     "react": "^18.3.0",
@@ -144,7 +146,7 @@ export const inject = ["slots", "locale", "connection"];
 
 从 `0.1.0-rc.8` 起，`dsh.client.external` 声明非 baseline 值导入的精确模块 specifier。同步 `require` 不能等待，因此该图决定动态供应包的工厂先于消费者到达，并拒绝环。
 
-默认 baseline 对每个动态 Client bundle 隐式可用：
+`0.1.2-rc.1` 的 baseline 对每个动态 Client bundle 隐式可用（其他版本按[版本基线](version-and-integration-boundaries.md)核对）：
 
 ```text
 react
@@ -154,7 +156,7 @@ react-dom/client
 @deepseek-ai/cordis
 @deepseek-ai/dsh-client-ui-slots
 @deepseek-ai/dsh-client-ui-primitives
-@deepseek-ai/dsh-client-runtime/client
+@deepseek-ai/dsh-client-store
 ```
 
 不要把 baseline 重复写进 `dsh.client.external`。若值导入 `@owner/shared-client/client`，则在 rc.8+ 的 manifest 中声明：
@@ -274,7 +276,9 @@ Mixed 插件在这里注册自己的 Host 服务、Settings 或 Remote。所有�
 ## Client 入口
 
 ```ts
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
+import type {} from "@deepseek-ai/dsh-client-locale/client";
 
 export const inject = ["slots", "locale"];
 
@@ -287,7 +291,7 @@ export function apply(ctx: ClientContext): void {
 
 ## 双 bundle 构建
 
-Host 输出 Node ESM；Client 输出浏览器 CJS，并包裹为 ModuleLoader 模块。下面是 `0.1.1-rc.2` baseline 上验证过的独立仓库模板，不是永久 bundler API：
+Host 输出 Node ESM；Client 输出浏览器 CJS，并包裹为 ModuleLoader 模块。下面是 `0.1.2-rc.1` baseline 上验证过的独立仓库模板，不是永久 bundler API：
 
 ```ts
 import { defineConfig } from "tsdown";
@@ -299,7 +303,7 @@ const externals = [
   "react-dom",
   "react-dom/client",
   "@deepseek-ai/cordis",
-  "@deepseek-ai/dsh-client-runtime/client",
+  "@deepseek-ai/dsh-client-store",
   "@deepseek-ai/dsh-client-ui-slots",
   "@deepseek-ai/dsh-client-ui-primitives",
 ];
@@ -332,6 +336,10 @@ export default defineConfig([
   }
 ]);
 ```
+
+构建必须接入产物检查与加载测试。检查器支持 `--harness-version 0.1.2-rc.1`、`0.1.5-alpha.1` 和旧版 `0.1.1-rc.2`；默认使用稳定版表，并明确打印基线，不自动推断宿主版本。未声明的非 baseline 请求和已移除的 runtime 请求会导致失败，未知版本也会拒绝猜测。
+
+产物 smoke 使用目标发布包的真实 `dsh-client-modules/client`，仅向静态表提供目标宿主已有的模块，然后导入实际 `lib/client.js`。不能让 mock `require` 对任意包返回占位值。至少验证旧模块 fixture 失败、新产物成功；主题类插件再验证 store 更新、保存与清理。CI 必须在构建后运行这些检查，源码单测不能替代。
 
 具体 bundler API 可能随版本变化。保留四个不变量：
 

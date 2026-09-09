@@ -26,7 +26,7 @@ description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harnes
 - [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)
 - [Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)
 - [API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)
-- 会话内动态包走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)
+- 会话内动态包走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/preset/agent-presets/presets/cordis/skills/cordis-plugin-development/SKILL.md)
 
 `master` 链接只用于导航。目标版本源码、公开类型和生成的 Catalog 优先于在线文档；版本观察必须记录 commit，不能写成永久 API。
 
@@ -54,11 +54,11 @@ description: 创建、改造、迁移、评审、调试和发布 DeepSeek Harnes
 
 - 当前提交的 `packages/extensions/cordis-client-runner/src/client/slot-catalog.ts`
 - 目标服务对应的 `src/client/index.ts` 和类型声明
-- `packages/host/apiproxy` 的 Web Settings namespace 暴露逻辑
+- `packages/api/settings-controller` 的 Web Settings namespace 暴露逻辑
 - 当前 profile 使用的 DeepSeek Harness 版本
 - 当前 Web 平台实际注册到 ModuleLoader 的 baseline、预加载模块和 `dsh.client.external` 供应图
 
-动态插件通过 `cordis_define` / `cordis_run` 交付纯 JavaScript Package，不能使用 import、JSX 或 TypeScript；可分发插件通过 `dsh.bundle` 安装到 profile。不要混用两套产物格式。会话内动态包改走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)。
+动态插件通过 `cordis_define` / `cordis_run` 交付纯 JavaScript Package，不能使用 import、JSX 或 TypeScript；可分发插件通过 `dsh.bundle` 安装到 profile。不要混用两套产物格式。会话内动态包改走官方 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/preset/agent-presets/presets/cordis/skills/cordis-plugin-development/SKILL.md)。
 
 ## 先判断插件类型
 
@@ -125,7 +125,7 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 
 长任务不要把 `execute` 阻塞到结束。官方[工具编写参考](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-tool.zh.md)要求用 `ctx.jobs.start`，成功的后台分支返回 `{ kind: 'background', jobId }`；约定见[后台任务运行时](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/jobs.zh.md)。若刻意不用官方 jobs、改用 overlay + 产物文件判定完成，必须写明原因，并处理 `process.kill(pid, 0)` 的 pid 复用：核对 `ps` 命令行是否仍是本插件脚本，不能只看 pid 还活着。detached 预览/浏览器进程还要有磁盘登记，Harness 重启后才能回收孤儿。
 
-官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 的 Remote 只处理一元请求和一元结果，没有推送。磁盘或任务要近实时，就在 Host 失效缓存并增加 `revision`，Client 轮询廉价状态方法。
+官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 的能力按版本判断：`0.1.2-rc.1` 已支持流式 Remote。先验证独立插件的 descriptor 挂载、取消与卸载；不需要流时可用 Host `revision` 与 Client 轮询。
 
 下面是文件工作台的项目约定，不是官方 API：产品正文以磁盘（或另一个明确的外部所有者）为真源；overlay / 插件状态只记工作台标记，不复制一份目录。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段。
 
@@ -186,7 +186,7 @@ ctx.effect(() => () => release(), "release theme overrides");
 
 Settings 暴露必须按版本判断：rc.5 的 Web RPC 使用显式集合；rc.7 起会返回全部已注册 namespace 的脱敏描述。无论哪一版，都先用实际 `settings.describe` 证明 Client 可绑定；配置 API 仍受 loopback 信任边界约束。具体证据和降级路径见 [persistence-and-release.md](references/persistence-and-release.md)。
 
-普通设置遵循官方 [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md) 与 [Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)：
+普通设置遵循官方 [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md) 与 [Settings Controller](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)：
 
 - 使用路径级 `settings.mutate`，只修改插件拥有的字段，不覆盖整个 namespace。
 - 携带 `expectedRevision`；发生冲突时保留草稿并提示刷新，不盲目重试。
@@ -202,6 +202,8 @@ Client bundle 需要包装为 Harness 的 ModuleLoader 模块，并把目标版�
 
 不要为了消除编译问题，把所有宿主模块复制进 bundle。那会产生重复 React、Context 断裂、包体膨胀或运行时不兼容。
 
+`0.1.2-rc.1` 已移除 `dsh-client-runtime/client`：`defineStore` 改从 `dsh-client-store` 导入，Context 类型来自 Cordis，`slots` 类型由 Renderer 扩展。稳定版与 alpha 使用不同模块表，具体迁移见[版本基线](references/version-and-integration-boundaries.md)。
+
 构建后提取 `lib/client.js` 中真实的 `require(...)` 集合，并逐项归类为 baseline、显式 `external` 或插件私有 bundle。所有会影响结果的实时设置都要进入缓存 key；切换 provider、model、baseURL 或路由后不得复用旧结果。
 
 ### 7. 验证
@@ -212,7 +214,7 @@ Client bundle 需要包装为 Harness 的 ModuleLoader 模块，并把目标版�
 pnpm typecheck
 pnpm test
 pnpm build
-node "$SKILL_DIR/scripts/check_plugin.mjs" /path/to/plugin
+node "$SKILL_DIR/scripts/check_plugin.mjs" /path/to/plugin --harness-version <实际完整版本>
 dsh --profile <name> --dump-config
 ```
 
@@ -230,6 +232,8 @@ dsh --profile <name> --dump-config
 - Client bundle 的 ModuleLoader ID 与包名一致；真实 `require(...)` 都属于 baseline 或 `dsh.client.external`，其供应图无环。
 
 涉及人可见 UI 时，把视觉验收当作完成条件：至少覆盖空态、加载态、错误态、选中态，以及此次修改直接影响的切换、按钮和官方入口；替换整列 UI 时再覆盖其原有能力清单。没有用户授权浏览器自动化时，先完成静态、构建和运行时检查，再请用户人工确认或明确标注“代码已验证，视觉尚未确认”。没有真实页面证据时，不宣称 UI 已完全修复。
+
+模块加载修复必须用目标官方加载器运行发布产物，并保留“旧引用失败、新产物成功”的回归；不能用宽松的 `require` mock 掩盖缺包。检查器不自动识别实际宿主，版本必须显式核对。
 
 测试分四层：包内单测、源码面真实入口集成、构建产物 smoke、组合与人可见界面验收。不要只断言内部方法被调用；要验证最终文件、进程、manifest、事件或页面确实发生了预期变化。高风险生命周期和清理代码同时核对官方[测试策略](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/testing.zh.md)与[防御性模式](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/defensive-patterns.zh.md)。
 

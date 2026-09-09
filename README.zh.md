@@ -73,7 +73,7 @@ ln -s "$(pwd)/build-deepseek-harness-plugin" ~/.codex/skills/build-deepseek-harn
 检查一个插件目录：
 
 ```sh
-node scripts/check_plugin.mjs /path/to/plugin
+node scripts/check_plugin.mjs /path/to/plugin --harness-version 0.1.2-rc.1
 ```
 
 ## 配置
@@ -82,7 +82,7 @@ node scripts/check_plugin.mjs /path/to/plugin
 
 ## 兼容性、数据与权限边界
 
-- 当前维护基线是 DeepSeek Harness `0.1.1-rc.2`，不代表无条件兼容。Slot、Settings 暴露、Client 模块边和 Remote 挂载都要对照目标 commit。
+- 当前维护基线：Harness `0.1.2-rc.1`（npm latest）；已核对最新 alpha `0.1.5-alpha.1` 的模块表，核对日期 2026-09-09。检查器按具体版本拦截旧 runtime 与缺失 external；alpha 的界面尚未实机验证。
 - 独立 GitHub 包不会因为 Host 声明了 `@Remote` 就自动出现在 `ctx.remote`。
 - Skill 会读取插件和 Harness 源码、运行本地构建/检查命令，只修改或发布用户明确放入范围的仓库；不需要凭据，也不会把项目数据发送到外部服务。
 - 这是社区笔记。与官方文档冲突时以官方为准。

@@ -13,7 +13,7 @@
 - [如何判断安装成功](#如何判断安装成功)
 - [故障排查顺序](#故障排查顺序)
 
-官方依据：[Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)、[Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)、[本地凭据提供方](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/credentials/credentials-local/README.zh.md)、[配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)、[Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)、[API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)、[Typert 远程调用](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/typert.zh.md)、[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。`master` 只用于导航；namespace 暴露范围、Remote 生成方式和 wire 契约以目标 commit 与实际运行时为准。
+官方依据：[Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md)、[Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)、[本地凭据提供方](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/credentials/credentials-local/README.zh.md)、[配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)、[Settings Controller](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)、[API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)、[Typert 远程调用](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/typert.zh.md)、[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。`master` 只用于导航；namespace 暴露范围、Remote 生成方式和 wire 契约以目标 commit 与实际运行时为准。
 
 ## 先选择状态范围
 
@@ -29,11 +29,11 @@
 
 - `0.1.0-rc.5` / commit `47f943859bef60e4160492346772ded9b24f765a`：Web Settings RPC 只返回显式集合，普通第三方 namespace 不会因 Host 注册而自动加入。
 - `0.1.0-rc.7` / commit `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca` 起：Web `settings.describe` 返回全部已注册 namespace 的脱敏描述，写入也不再检查产品白名单。
-- 当前维护基线 `0.1.1-rc.2` / commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` 延续 rc.7 行为。
+- 当前维护基线 `0.1.2-rc.1` / commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d` 已迁移到 Settings Controller；仍需用实际 `settings.describe` 验证命名空间与脱敏。
 - [Client Remote 聚合](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/remotes/src/client/index.ts)仍在 Harness 构建期静态选择并挂载固定的 `/remote` contributions；独立安装包只在 Host 声明 `@Remote`，不会让 `ctx.remote.<namespace>` 自动出现。
 - Settings/Credentials 配置面仅允许 loopback；非 loopback 浏览器的 [SettingsScope](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings/src/client/settings-scope.ts)会降级为进程内 memory，而不是跨机器同步。
 
-版本升级后必须重新查看 [`packages/host/apiproxy/README.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)、`packages/host/apiproxy/src/api-proxy.ts` 和 `settings.describe` 的实际返回。不要把 rc.5 的白名单限制写成永久结论，也不要为 rc.7+ 要求用户修改不存在的白名单。
+版本升级后必须重新查看 [`packages/api/settings-controller/README.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)、`packages/api/settings-controller/src/index.ts` 和 `settings.describe` 的实际返回。不要把 rc.5 的白名单限制写成永久结论，也不要为 rc.7+ 要求用户修改不存在的白名单。
 
 ## 浏览器本地持久化
 
@@ -94,7 +94,7 @@ Host 注册服务不等于 Client 自动获得 `ctx.remote.<namespace>`。开始
 
 若目标版本不允许外部插件可靠挂载自己的 Remote，选择浏览器本地持久化、已有公开 Settings namespace，或向 Harness 提交通用扩展点；不要用私有 HTTP 路由、DOM 通道或修改 Host 白名单冒充官方 Remote。
 
-独立仓库也可以手写 invocation descriptor（zod codec + `TypertRemoteService`），再导出 `./typert` 并在 Client 里 `ctx.remote.$mount(...)`。这是已验证的项目约定，不是官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 生成流水线的替代文档。Host 与 Client 必须同一套方法与 schema。改契约后要重建两端、**重启** `dsh` 进程，再硬刷新浏览器。官方 Gateway 只处理一元请求和一元结果，没有推送；磁盘或任务要近实时，就由 Host 失效缓存并增加 `revision`，Client 轮询廉价状态。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段，官方文档没有单独写这条。
+独立仓库也可以手写 invocation descriptor（zod codec + `TypertRemoteService`），再导出 `./typert` 并在 Client 里 `ctx.remote.$mount(...)`。这是已验证的项目约定，不是官方 [API Gateway](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md) 生成流水线的替代文档。Host 与 Client 必须同一套方法与 schema。改契约后要重建两端、**重启** `dsh` 进程，再硬刷新浏览器。`0.1.2-rc.1` 的 Gateway 已支持 `@Remote({ mode: "stream" })` 与 `AsyncIterable`，不能继续套用旧版“仅一元调用”的限制。先确认独立插件能挂载相同的流式 descriptor，并验证取消、重连与卸载；不需要流时可使用 Host `revision` 加 Client 轮询。Gateway 调用的是 Cordis 上注册的实时服务；基线观察是 Remote 服务不要用 `#private` 字段，官方文档没有单独写这条。
 
 本地开发可以把 `lib/` hardlink 或 `file:` 链到 `$DSH_HOME/profiles/<name>/node_modules/<pkg>`，这样 `pnpm build` 会更新运行树。只改已有方法内部实现通常不必重启；改 schema、方法名、`dsh.client` metadata、Remote descriptor 或 patch 行必须重启。`file:` 依赖是打包硬链接：tsdown 原地写 JS 会一起更新，但 `cp` 附属脚本会 unlink 后新建，profile 里那份变成孤儿旧文件。附属脚本必须原地覆写。detached 预览服务、Ego 空间这类进程不能只记内存 Map；Harness 重启后 Map 丢了、进程还在，要有磁盘登记并在启动时按 pid/命令行回收。
 
@@ -264,6 +264,10 @@ Client 插件把 React 或 Harness Client 包放进 `peerDependencies`，而 pro
 4. Cordis composition 是否包含插件 ID。
 5. Host 启动日志是否有模块解析错误。
 
+### 模块表缺少 runtime
+
+先确定实际进程加载的 Harness 包版本，避免拿旁边的旧源码 checkout 当作运行时。按[版本基线](version-and-integration-boundaries.md)迁移 `defineStore`、Context 与 Renderer 类型，并用带版本参数的检查器拦住旧引用。重建后确认 GitHub 仓库提交了 `lib/`，实际 profile 锁定到新 SHA，再检查服务端返回的 bundle；宿主会改写 source map URL，比较代码时应排除这类包装差异。
+
 ### 设置入口没出现
 
 1. `dsh.client.platform` 是否为 `web`。
@@ -295,7 +299,7 @@ Client 插件把 React 或 Harness Client 包放进 `peerDependencies`，而 pro
 ### 更新插件后界面仍是旧版本
 
 1. profile lockfile 是否指向新的 GitHub commit。
-2. 是否执行 remove → add 刷新安装缓存。
+2. 是否重新 add 固定 GitHub SHA 并核对安装产物；只有确认需要清理缓存时才 remove → add，避免误改 profile 组合。
 3. Harness 是否重启，Client 模块表是否更新。
 4. 浏览器页面是否刷新，boot manifest 是否更新。
 5. manifest 中的 bundle URL 是否实际返回新代码。

@@ -54,8 +54,8 @@ function fixture({ loaderId = "@example/plugin", clientBody = "" } = {}) {
   return root;
 }
 
-function run(root) {
-  return spawnSync(process.execPath, [checker, root], { encoding: "utf8" });
+function run(root, args = []) {
+  return spawnSync(process.execPath, [checker, root, ...args], { encoding: "utf8" });
 }
 
 function updatePackage(root, update) {
@@ -267,7 +267,7 @@ test("拒绝非数组的 dsh.client.external", () => {
   }
 });
 
-test("提示 rc.8+ 非 baseline require 缺少 external 声明", () => {
+test("拒绝 rc.8+ 非 baseline require 缺少 external 声明", () => {
   const root = fixture({ clientBody: 'require("@example/shared/client");' });
   try {
     updatePackage(root, (pkg) => {
@@ -275,7 +275,7 @@ test("提示 rc.8+ 非 baseline require 缺少 external 声明", () => {
       pkg.devDependencies["@example/shared"] = "1.0.0";
     });
     const result = run(root);
-    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.match(result.stdout, /dsh\.client\.external 未声明/);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -297,4 +297,65 @@ test("接受与构建产物一致的 rc.8+ external 请求", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("当前稳定版接受 client-store 且不要求冗余 external", () => {
+  const root = fixture({ clientBody: 'require("@deepseek-ai/dsh-client-store");' });
+  try {
+    updatePackage(root, (pkg) => { pkg.devDependencies["@deepseek-ai/dsh-client-store"] = "0.1.2-rc.1"; });
+    const result = run(root);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /模块表基线：Harness 0\.1\.2-rc\.1/);
+    assert.match(result.stdout, /0 个错误，0 个警告/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const external of [false, true]) {
+  test(`当前稳定版拒绝旧 runtime 引用（external=${external}）`, () => {
+    const root = fixture({ clientBody: 'require("@deepseek-ai/dsh-client-runtime/client");' });
+    try {
+      updatePackage(root, (pkg) => {
+        pkg.devDependencies["@deepseek-ai/dsh-client-runtime"] = "0.1.1-rc.2";
+        if (external) pkg.dsh.client.external = ["@deepseek-ai/dsh-client-runtime/client"];
+      });
+      const result = run(root);
+      assert.equal(result.status, 1, result.stdout + result.stderr);
+      assert.match(result.stdout, /已移除.*dsh-client-runtime\/client/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+test("显式选择已核对旧版时保留 runtime 兼容分支", () => {
+  const root = fixture({ clientBody: 'require("@deepseek-ai/dsh-client-runtime/client");' });
+  try {
+    updatePackage(root, (pkg) => { pkg.devDependencies["@deepseek-ai/dsh-client-runtime"] = "0.1.1-rc.2"; });
+    const result = run(root, ["--harness-version", "0.1.1-rc.2"]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /0 个错误，0 个警告/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("dockkit 只属于已核对的 alpha 模块表，不外推到稳定版", () => {
+  const root = fixture({ clientBody: 'require("@deepseek-ai/dsh-client-ui-dockkit");' });
+  try {
+    updatePackage(root, (pkg) => { pkg.devDependencies["@deepseek-ai/dsh-client-ui-dockkit"] = "0.1.5-alpha.1"; });
+    assert.equal(run(root).status, 1);
+    const result = run(root, ["--harness-version", "0.1.5-alpha.1"]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /0 个错误，0 个警告/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("拒绝猜测未核对的版本或缺失版本参数", () => {
+  const root = fixture();
+  try {
+    for (const version of ["0.1.9-alpha.1", "toString"]) {
+      const result = run(root, ["--harness-version", version]);
+      assert.equal(result.status, 2);
+      assert.match(result.stderr, /尚未核对/);
+    }
+    const result = run(root, ["--harness-version"]);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /需要完整版本号/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

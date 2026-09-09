@@ -73,7 +73,7 @@ Then name `$build-deepseek-harness-plugin` on the next plugin task.
 Check a plugin checkout:
 
 ```sh
-node scripts/check_plugin.mjs /path/to/plugin
+node scripts/check_plugin.mjs /path/to/plugin --harness-version 0.1.2-rc.1
 ```
 
 ## Configuration
@@ -82,7 +82,7 @@ The skill needs no API key or service account. For version-sensitive work, give 
 
 ## Compatibility and security boundaries
 
-- Maintainer baseline: DeepSeek Harness `0.1.1-rc.2`; this is not a blanket compatibility promise. Slot names, Settings exposure, Client module edges, and Remote mounting must be re-checked against the target commit.
+- 当前维护基线：Harness `0.1.2-rc.1`（npm latest）；已核对最新 alpha `0.1.5-alpha.1` 的模块表，核对日期 2026-09-09。检查器按具体版本拦截旧 runtime 与缺失 external；alpha 的界面尚未实机验证。
 - Independent GitHub packages do not automatically appear on `ctx.remote` just because Host declared `@Remote`.
 - The skill reads plugin and Harness source, can run local build/check commands, and only edits or publishes repositories the user placed in scope. It does not require credentials or send project data to a service.
 - This is community field notes. If it disagrees with official docs, follow official docs.

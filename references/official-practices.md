@@ -1,6 +1,6 @@
 # 官方规范与核对入口
 
-本页用于区分“官方稳定契约”“当前版本源码事实”和“项目实战约定”。最后核对基线：DeepSeek Harness commit `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`（核对日期 2026-08-26），`@deepseek-ai/dsh` 为 `0.1.1-rc.2`。具体版本分界见 [version-and-integration-boundaries.md](version-and-integration-boundaries.md)。Harness 仍处于 Developer Preview，每个任务都要重新记录目标 commit、实际安装版本、profile 和启动宿主，不能只写一个版本号。
+本页用于区分“官方稳定契约”“当前版本源码事实”和“项目实战约定”。最后核对基线：DeepSeek Harness commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d`（核对日期 2026-09-09），`@deepseek-ai/dsh` 为 `0.1.2-rc.1`。具体版本分界见 [version-and-integration-boundaries.md](version-and-integration-boundaries.md)。Harness 仍处于 Developer Preview，每个任务都要重新记录目标 commit、实际安装版本、profile 和启动宿主，不能只写一个版本号。
 
 ## 目录
 
@@ -43,14 +43,14 @@
 - [Credentials](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/credentials.zh.md)
 - [本地凭据提供方](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/credentials/credentials-local/README.zh.md)
 - [配置模型](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/providers.zh.md)
-- [Web API Proxy](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/host/apiproxy/README.zh.md)
+- [Settings Controller](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)
 - [API Gateway 与 Remote](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/api-gateway.zh.md)
 - [Typert 远程调用](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/typert.zh.md)
-- [官方动态插件 Skill](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)
+- [官方动态插件 Skill](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/preset/agent-presets/presets/cordis/skills/cordis-plugin-development/SKILL.md)
 - [测试策略](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/testing.zh.md)
 - [防御性模式](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/defensive-patterns.zh.md)
 
-这些 `master` 链接用于找到官方入口，不是版本证据。本地有官方仓库时，优先读同一提交下的文件和生成 Catalog；需要记录某项版本观察时，使用 commit 固定链接，例如[基线 Slot Catalog](https://github.com/deepseek-ai/deepseek-harness/blob/b150a551b8d465e31e418e1b2eaf5e79bbb7d28e/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)。
+这些 `master` 链接用于找到官方入口，不是版本证据。本地有官方仓库时，优先读同一提交下的文件和生成 Catalog；需要记录某项版本观察时，使用 commit 固定链接，例如[基线 Slot Catalog](https://github.com/deepseek-ai/deepseek-harness/blob/a66e4702047846cdaa10c66c9d3df3951f5ea70d/packages/extensions/cordis-client-runner/src/client/slot-catalog.ts)。
 
 ## 实践与证据映射
 
@@ -64,8 +64,8 @@
 | Slot 类型、scope、props、占用与替换风险 | 目标提交生成的 Slot Catalog、Client Slot 注册表 |
 | `MarkdownText` 图片与链接策略 | UI primitives README |
 | Theme API、Token 与样式职责 | Theme 服务、Web UI 样式规范、目标提交类型定义 |
-| Settings 暴露范围与 revision 写入 | Settings、Web API Proxy、`settings.describe` 实际结果 |
-| Credentials 只写、文件路径与 env 遮蔽 | Credentials、本地凭据提供方、配置模型、Web API Proxy |
+| Settings 暴露范围与 revision 写入 | Settings、Settings Controller、`settings.describe` 实际结果 |
+| Credentials 只写、文件路径与 env 遮蔽 | Credentials、本地凭据提供方、配置模型、Settings Controller |
 | Client→Host Remote | API Gateway、Typert 远程调用、目标业务包生成的 `/remote` 贡献 |
 | 测试与资源清理 | 测试策略、防御性模式 |
 
@@ -87,7 +87,7 @@
 | 动态 Cordis Plugin/Package | 在 Harness 会话中快速定义、运行、更新和回滚 | Host/Client 是纯 JavaScript 函数体；先通过 Inspect Provider 查询真实 API；不能使用 import、JSX 或 TypeScript |
 | 可分发组合包 | 通过 npm、tarball 或 GitHub 安装到 profile | 需要 `package.json`、`dsh.bundle`、Cordis patch、Host 入口；Web 插件还要提供 ModuleLoader Client bundle |
 
-本 Skill 默认处理可分发组合包。若任务明确使用 `cordis_define` / `cordis_run`，先读取官方内置 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/cli/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md)，不要把两套产物格式混用。官方[第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)用 `--patch` 加载本地源码；把它变成可安装组合包的官方路径是[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。官方仓库内的[添加 workspace 包](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-package.zh.md)只适用于 Harness monorepo，不是第三方组合包教程。
+本 Skill 默认处理可分发组合包。若任务明确使用 `cordis_define` / `cordis_run`，先读取官方内置 [`cordis-plugin-development`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/preset/agent-presets/presets/cordis/skills/cordis-plugin-development/SKILL.md)，不要把两套产物格式混用。官方[第一个插件](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/index.zh.md)用 `--patch` 加载本地源码；把它变成可安装组合包的官方路径是[打包与安装](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.zh.md)。官方仓库内的[添加 workspace 包](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/adding-a-package.zh.md)只适用于 Harness monorepo，不是第三方组合包教程。
 
 ## 插件与生命周期
 
