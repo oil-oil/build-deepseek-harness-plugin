@@ -158,7 +158,7 @@ export const Config: Schema<Config> = Schema.object({
 官方依据：[Client 模块](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/client-modules.zh.md)、[Client Slot 注册表](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-slots/README.zh.md)、[Theme 服务](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-theme/README.zh.md)、[Web UI 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/web-styling.zh.md)。
 
 - 启用的 Loader 行所指包通过 `dsh.client.platform = "web"` 与 `exports["./client"]` 进入 `window.__DSH_BOOT__`；`dsh.client.inject` 只是信息边，不负责启用或排序。
-- rc.8+ 用 `dsh.client.external` 声明非 baseline 同步模块请求；该图约束代码到达顺序且拒绝环，与 Cordis 服务 `inject` 无关。
+- 当前基线 用 `dsh.client.external` 声明非 baseline 同步模块请求；该图约束代码到达顺序且拒绝环，与 Cordis 服务 `inject` 无关。
 - entry `id` 等于包名；bundle 的内容哈希形成 `rev`。插件集合变化通常需要重启，bundle 内容变化才走 HMR rebuild。
 - Feature UI 使用 CSS Modules、语义 `--dsw-alias-*` Token 和已有 typography；不要复制静态色值、在组件 CSS 中写 light/dark 分支或增加另一套全局主题。
 - 字号与行高成对设置；保留键盘焦点和 reduced-motion 行为。
@@ -197,7 +197,7 @@ export const Config: Schema<Config> = Schema.object({
 - Config、Service、Event、Slot、Theme Token 的实际类型和 Catalog。
 - `defineTool`、`ctx.jobs` 与工具 schema 是否仍按官方教程进入系统提示。
 - Web ModuleLoader baseline、`dsh.client.external` 供应图与 Client bundle 的真实 `require(...)`。
-- Settings namespace 是否向 Web 暴露；rc.5 与 rc.7+ 必须分支判断。核对 Credentials 的 describe/set/unset/resolve 和 record/authorization 契约。
+- Settings namespace 是否向 Web 暴露；以实际 Controller 和 `settings.describe` 核对。核对 Credentials 的 describe/set/unset/resolve 和 record/authorization 契约。
 - 独立安装包的 `/remote` contribution 是否会被 Client 组合发现并挂载。
 - Settings、Credentials、目录选择和本地文件能力的 loopback/trust 边界。
 - Git 安装策略、pnpm 版本和 `allowBuilds` 行为。

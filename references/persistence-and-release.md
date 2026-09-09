@@ -20,20 +20,18 @@
 | 需求 | 方案 | 优点 | 限制 |
 | --- | --- | --- | --- |
 | 当前浏览器保存 UI 偏好 | 版本化 `localStorage` | 独立、简单 | 不跨浏览器、不跨 origin |
-| 跟随 Harness profile 的普通配置 | Host 注册 Settings + Client `settingsScope` | 可集中存储、可校验 | rc.5 过滤第三方 namespace；配置 API 仅 loopback |
+| 跟随 Harness profile 的普通配置 | Host 注册 Settings + Client `settingsScope` | 可集中存储、可校验 | 需验证 namespace 可见；配置 API 仅 loopback |
 | Settings 不能表达的 Host 能力 | 已验证可挂载的 Remote | 类型化、自定义方法 | 独立安装包没有自动 Remote 聚合 |
 
 ## 已验证的版本限制
 
-版本必须分支判断：
+当前基线核对：
 
-- `0.1.0-rc.5` / commit `47f943859bef60e4160492346772ded9b24f765a`：Web Settings RPC 只返回显式集合，普通第三方 namespace 不会因 Host 注册而自动加入。
-- `0.1.0-rc.7` / commit `99f6f02fecdb7dff40c3fbc9470f5907c29f74ca` 起：Web `settings.describe` 返回全部已注册 namespace 的脱敏描述，写入也不再检查产品白名单。
 - 当前维护基线 `0.1.2-rc.1` / commit `a66e4702047846cdaa10c66c9d3df3951f5ea70d` 已迁移到 Settings Controller；仍需用实际 `settings.describe` 验证命名空间与脱敏。
 - [Client Remote 聚合](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/remotes/src/client/index.ts)仍在 Harness 构建期静态选择并挂载固定的 `/remote` contributions；独立安装包只在 Host 声明 `@Remote`，不会让 `ctx.remote.<namespace>` 自动出现。
 - Settings/Credentials 配置面仅允许 loopback；非 loopback 浏览器的 [SettingsScope](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings/src/client/settings-scope.ts)会降级为进程内 memory，而不是跨机器同步。
 
-版本升级后必须重新查看 [`packages/api/settings-controller/README.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)、`packages/api/settings-controller/src/index.ts` 和 `settings.describe` 的实际返回。不要把 rc.5 的白名单限制写成永久结论，也不要为 rc.7+ 要求用户修改不存在的白名单。
+版本升级后必须重新查看 [`packages/api/settings-controller/README.zh.md`](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)、`packages/api/settings-controller/src/index.ts` 和 `settings.describe` 的实际返回。不要沿用旧版本的白名单结论，也不要要求用户修改核心白名单。
 
 ## 浏览器本地持久化
 
@@ -74,7 +72,7 @@ export function saveSettings(storage: Storage, value: Settings): boolean {
 
 ## profile 级持久化
 
-若需要跨浏览器窗口、与 CLI 共用普通配置，rc.7+ 优先注册插件自己的 Settings namespace，再由 Client `settingsScope` 绑定；先用实际 `settings.describe` 证明可见。只有 Settings 不能表达自定义 Host 操作时才进入下方 Remote 可行性门禁。独立 GitHub 安装包不能只靠自有 `@Remote` 自动打通 Client→Host：
+若需要跨浏览器窗口、与 CLI 共用普通配置，优先注册插件自己的 Settings namespace，再由 Client `settingsScope` 绑定；先用实际 `settings.describe` 证明可见。只有 Settings 不能表达自定义 Host 操作时才进入下方 Remote 可行性门禁。独立 GitHub 安装包不能只靠自有 `@Remote` 自动打通 Client→Host：
 
 1. Host 注册插件自己的 Settings schema 或存储服务。
 2. Host 暴露最小的类型化 Remote，例如 `getThemeSettings`、`setThemeSettings`。
@@ -250,7 +248,7 @@ Client 插件把 React 或 Harness Client 包放进 `peerDependencies`，而 pro
 1. 编译和类型检查需要的包放在 `devDependencies`。
 2. Host 值导入若由 Harness 提供，可按目标官方包惯例声明 peer；否则放 `dependencies`。
 3. Cordis 服务依赖写 Client `export const inject`；`dsh.client.inject` 只保留真实包级信息边。
-4. Client 值模块由 bundler externalize；baseline 隐式提供，rc.8+ 非 baseline 请求写入 `dsh.client.external`。
+4. Client 值模块由 bundler externalize；baseline 隐式提供，当前版本的非 baseline 请求写入 `dsh.client.external`。
 
 不要为了消除告警机械删除所有 peer，也不要让用户在 Harness profile 根目录手动安装一长串内部包；两者都可能造成运行时缺包或版本漂移。以 boot manifest、真实 bundle `require(...)` 和 Client load report 判断。
 

@@ -26,10 +26,6 @@ for (let index = 0; index < args.length; index += 1) {
 }
 // 只录入已核对的 platform.ts，不把某个 rc/alpha 的模块表外推到其他版本。
 const baselines = {
-  "0.1.1-rc.2": {
-    commit: "b150a551b8d465e31e418e1b2eaf5e79bbb7d28e",
-    modules: ["@deepseek-ai/dsh-client-runtime/client"],
-  },
   "0.1.2-rc.1": {
     commit: "a66e4702047846cdaa10c66c9d3df3951f5ea70d",
     modules: ["@deepseek-ai/dsh-client-store"],
@@ -259,7 +255,7 @@ if (client) {
   let declaredExternals = [];
   if (client.external !== undefined) {
     if (!Array.isArray(client.external)) {
-      addError("dsh.client.external 必须是字符串数组（该字段从 Harness 0.1.0-rc.8 起可用）。");
+      addError("dsh.client.external 必须是字符串数组（按目标 Harness manifest 核对）。");
     } else {
       declaredExternals = client.external.filter((item) => typeof item === "string" && item.length > 0);
       if (declaredExternals.length !== client.external.length) {
@@ -339,7 +335,7 @@ if (client) {
       if (baselineExternals.has(specifier) || declaredExternals.includes(specifier)) continue;
       addError(
         `Client bundle 留下非 baseline require(${JSON.stringify(specifier)})，但 dsh.client.external 未声明；` +
-        "Harness 0.1.0-rc.8+ 的同步模块图可能无法先注册其供应工厂。",
+        "当前 Harness 同步模块图无法保证供应工厂先注册。",
       );
     }
     for (const specifier of declaredExternals) {
@@ -417,7 +413,7 @@ if (hasConfigType && !hasConfigSchema) {
 if (/settingsScope\s*\.\s*bind\b/.test(combinedSource)) {
   addNote(
     "源码使用 settingsScope.bind（含泛型写法）。必须通过目标运行时 settings.describe 验证 namespace：" +
-    "rc.5 仅暴露显式集合，rc.7+ 暴露全部已注册 namespace；配置 API 仍仅限 loopback。",
+    "确认目标 namespace 已注册且 Client 可见；配置 API 仍仅限 loopback。",
   );
 }
 

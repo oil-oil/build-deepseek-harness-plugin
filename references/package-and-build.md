@@ -144,7 +144,7 @@ export const inject = ["slots", "locale", "connection"];
 
 ### 3. ModuleLoader 模块请求图
 
-从 `0.1.0-rc.8` 起，`dsh.client.external` 声明非 baseline 值导入的精确模块 specifier。同步 `require` 不能等待，因此该图决定动态供应包的工厂先于消费者到达，并拒绝环。
+当前基线中，`dsh.client.external` 声明非 baseline 值导入的精确模块 specifier。同步 `require` 不能等待，因此该图决定动态供应包的工厂先于消费者到达，并拒绝环。
 
 `0.1.2-rc.1` 的 baseline 对每个动态 Client bundle 隐式可用（其他版本按[版本基线](version-and-integration-boundaries.md)核对）：
 
@@ -159,7 +159,7 @@ react-dom/client
 @deepseek-ai/dsh-client-store
 ```
 
-不要把 baseline 重复写进 `dsh.client.external`。若值导入 `@owner/shared-client/client`，则在 rc.8+ 的 manifest 中声明：
+不要把 baseline 重复写进 `dsh.client.external`。若值导入 `@owner/shared-client/client`，则在 当前基线的 manifest 中声明：
 
 ```json
 {
@@ -172,7 +172,7 @@ react-dom/client
 }
 ```
 
-支持 rc.5/rc.7 时不能假设 `external` 协议存在，必须按目标版本的固定共享表和实际加载器行为构建另一条兼容路径。
+若实际宿主不在当前基线内，重新核对其模块协议，不在模板中长期堆积旧版本兼容分支。
 
 ### 4. 构建产物的真实值请求
 
@@ -190,7 +190,7 @@ rg -o 'require\("[^"]+"\)' lib/client.js | sort -u
 | --- | --- | --- |
 | Client 编译使用的 React、Harness Client 包 | `devDependencies`；若目标官方包用 peer 表达兼容范围，可同时声明 peer | 本地类型检查和构建需要 |
 | Client baseline 值模块 | bundler external；不要重复写进 `dsh.client.external` | 运行时由 Web ModuleLoader 平台表提供 |
-| rc.8+ 非 baseline 值模块 | bundler external + 精确 `dsh.client.external`；动态 DSH 包通常同时为 peer + dev | 运行时由模块请求图提供并排序 |
+| 当前版本的非 baseline 值模块 | bundler external + 精确 `dsh.client.external`；动态 DSH 包通常同时为 peer + dev | 运行时由模块请求图提供并排序 |
 | 打进 Client bundle 的小型纯 JS 库 | `dependencies`，并由 bundler 打包 | 插件自行携带 |
 | Host 在 Node 运行时直接 `import` 的包 | `dependencies` 或确实由宿主提供时用 `peerDependencies` | Node 入口需要正常解析 |
 | 仅类型包、测试工具、构建工具 | `devDependencies` | 不参与运行 |
@@ -337,7 +337,7 @@ export default defineConfig([
 ]);
 ```
 
-构建必须接入产物检查与加载测试。检查器支持 `--harness-version 0.1.2-rc.1`、`0.1.5-alpha.1` 和旧版 `0.1.1-rc.2`；默认使用稳定版表，并明确打印基线，不自动推断宿主版本。未声明的非 baseline 请求和已移除的 runtime 请求会导致失败，未知版本也会拒绝猜测。
+构建必须接入产物检查与加载测试。检查器支持 `--harness-version 0.1.2-rc.1`和 `0.1.5-alpha.1`；默认使用稳定版表，并明确打印基线，不自动推断宿主版本。未声明的非 baseline 请求和已移除的 runtime 请求会导致失败，未知版本也会拒绝猜测。
 
 产物 smoke 使用目标发布包的真实 `dsh-client-modules/client`，仅向静态表提供目标宿主已有的模块，然后导入实际 `lib/client.js`。不能让 mock `require` 对任意包返回占位值。至少验证旧模块 fixture 失败、新产物成功；主题类插件再验证 store 更新、保存与清理。CI 必须在构建后运行这些检查，源码单测不能替代。
 

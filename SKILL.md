@@ -103,11 +103,11 @@ Mixed 只是代码形态，不代表 Host→Client 通路自动存在；先通�
 | --- | --- | --- |
 | Client `export const inject` | Cordis 运行时服务名 | `slots`、`locale`、`connection` |
 | `dsh.client.inject` | Client 包级信息边；供 preflight/HMR 使用 | `@deepseek-ai/dsh-client-ui-slots` |
-| `dsh.client.external` | rc.8+ 非 baseline 值模块的精确请求；约束代码到达顺序 | `@owner/shared-client/client` |
+| `dsh.client.external` | 当前版本的非 baseline 值模块的精确请求；约束代码到达顺序 | `@owner/shared-client/client` |
 | bundle 的 `require(...)` | externalize 后由 Web ModuleLoader 同步提供的值模块 | `react`、UI primitives |
 | npm 依赖字段 | 安装、运行兼容和本地编译关系 | dependencies、peer、devDependencies |
 
-只声明真正使用的服务和模块请求。`dsh.client.inject` 不启用 Loader 行，也不决定 Client apply 顺序；Cordis 服务等待决定激活，rc.8+ 的 `external` 模块图决定非 baseline 工厂先于消费者到达。常见 Cordis 服务包括：
+只声明真正使用的服务和模块请求。`dsh.client.inject` 不启用 Loader 行，也不决定 Client apply 顺序；Cordis 服务等待决定激活，当前基线的 `external` 模块图决定非 baseline 工厂先于消费者到达。常见 Cordis 服务包括：
 
 - `slots`：插入 UI。
 - `locale`：注册多语言文案。
@@ -184,7 +184,7 @@ ctx.effect(() => () => release(), "release theme overrides");
 - 跟随 Harness profile 或需要多端同步：先通过 Remote 可行性门禁；只有目标版本支持独立插件自包含生成并挂载通路时，才实现 Host Settings/Remote。
 - 使用 Harness `settingsScope`：必须先验证 `settings.describe` 能看到插件命名空间。
 
-Settings 暴露必须按版本判断：rc.5 的 Web RPC 使用显式集合；rc.7 起会返回全部已注册 namespace 的脱敏描述。无论哪一版，都先用实际 `settings.describe` 证明 Client 可绑定；配置 API 仍受 loopback 信任边界约束。具体证据和降级路径见 [persistence-and-release.md](references/persistence-and-release.md)。
+先用实际 `settings.describe` 证明 Client 可绑定，不沿用旧版本的 namespace 暴露结论；配置 API 仍受 loopback 信任边界约束。具体证据和降级路径见 [persistence-and-release.md](references/persistence-and-release.md)。
 
 普通设置遵循官方 [Settings](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/settings.zh.md) 与 [Settings Controller](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/api/settings-controller/README.zh.md)：
 
@@ -198,7 +198,7 @@ Credentials 与 Settings 是两个独立事务，不能伪造成原子保存。�
 
 ### 6. 正确构建浏览器 bundle
 
-Client bundle 需要包装为 Harness 的 ModuleLoader 模块，并把目标版本 baseline 模块 externalize。rc.8+ 的非 baseline 同步值导入还必须写入 `dsh.client.external`，模块图不能成环。编译所需包放入 `devDependencies`；Host 的值导入根据宿主是否提供选择 `dependencies` 或 `peerDependencies`。`dsh.client.inject` 只是信息边，不能替代 Cordis 服务注入、`external`、npm 依赖或 bundler 配置。
+Client bundle 需要包装为 Harness 的 ModuleLoader 模块，并把目标版本 baseline 模块 externalize。当前基线的非 baseline 同步值导入还必须写入 `dsh.client.external`，模块图不能成环。编译所需包放入 `devDependencies`；Host 的值导入根据宿主是否提供选择 `dependencies` 或 `peerDependencies`。`dsh.client.inject` 只是信息边，不能替代 Cordis 服务注入、`external`、npm 依赖或 bundler 配置。
 
 不要为了消除编译问题，把所有宿主模块复制进 bundle。那会产生重复 React、Context 断裂、包体膨胀或运行时不兼容。
 
@@ -243,7 +243,7 @@ dsh --profile <name> --dump-config
 
 1. lockfile 锁定到预期 GitHub commit。
 2. 重启 Harness，并轮询端口与 HTTP，避免用一次请求误判启动失败。
-3. 检查 `window.__DSH_BOOT__` 或等价 boot manifest 中存在插件、revision、信息 `inject` 边和 rc.8+ 的 `external` 模块边。
+3. 检查 `window.__DSH_BOOT__` 或等价 boot manifest 中存在插件、revision、信息 `inject` 边和 当前基线的 `external` 模块边。
 4. 直接请求插件 `client.js`，确认服务端提供的是新产物。
 5. 刷新浏览器页面，再检查 UI 和 Client load report。服务端模块图通常需要重启，浏览器 boot manifest 通常需要刷新。
 
@@ -296,5 +296,7 @@ node "$SKILL_DIR/scripts/check_references.mjs" "$SKILL_DIR" --harness /path/to/d
 ```
 
 `$SKILL_DIR` 为本目录。有 Codex skill-creator 时，`$SKILL_CREATOR` 指向它的 `scripts` 上一级。
+
+只维护当前稳定版与最新 alpha 的必要差异。旧版列表、单次故障过程和过期宿主案例留在 Git 历史；正文保留现行规则和能够拦住同类错误的回归测试。
 
 引用检查必须以目标 Harness checkout 运行；只检查 URL 字符串是否存在不足以证明版本兼容。

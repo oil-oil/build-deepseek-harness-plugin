@@ -43,7 +43,7 @@ Catalog 通常会给出：
 | `settings.action` | 设置窗口顶部操作 | 只放短操作 |
 | `shell.overlay` | 壳层浮层：自定义检查器、停靠面板 | 不替换对话子树；关闭时清掉自己加的 inset |
 | `sidebar` | 整列侧栏 | single 替换会丢掉子槽位，除非你重声明 children |
-| `sidebar.brand.mark` / `sidebar.brand.name` | rc.8+ 侧栏品牌图形与名称 | 优先替换品牌座位，不要为换 logo 接管整列 |
+| `sidebar.brand.mark` / `sidebar.brand.name` | 当前基线 侧栏品牌图形与名称 | 优先替换品牌座位，不要为换 logo 接管整列 |
 | `sidebar.footer.action` | 侧栏底部短操作 | 优先于替换整列 sidebar |
 | `details` | 官方工具行详情列 | 不要为自定义面板调用 `layout.openDetails` |
 
@@ -250,7 +250,7 @@ Web 包通过以下条件进入 boot graph：
 2. `dsh.client.platform = "web"`。
 3. `exports["./client"]` 指向可读取的构建产物。
 
-`dsh.client.inject` 只是信息图，不控制启停或 apply 顺序。rc.8+ 的 `dsh.client.external` 才表达非 baseline 同步模块请求，并约束供应工厂先于消费者到达。
+`dsh.client.inject` 只是信息图，不控制启停或 apply 顺序。当前基线的 `dsh.client.external` 才表达非 baseline 同步模块请求，并约束供应工厂先于消费者到达。
 
 `window.__DSH_BOOT__` 中的 entry ID 等于包名，`rev` 来自 bundle 内容哈希。需要区分两类更新：
 
