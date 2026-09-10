@@ -13,7 +13,7 @@
 
 # build-deepseek-harness-plugin
 
-An agent skill for **installed** DeepSeek Harness plugins. It tells the agent how to assemble a TypeScript bundle, pick a public slot, mount a Typert remote, store secrets in official credentials, and prove the plugin actually loaded.
+创建、改造和检查可安装的插件组合包，处理界面扩展、远程调用、设置、凭据及加载验收。
 
 Official first-plugin tutorials stay the source for the first mile. This skill adds the reload, layout, and credential rules that show up after you ship a real bundle.
 
